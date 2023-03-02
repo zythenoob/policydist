@@ -12,7 +12,7 @@ def my_train(config):
     kwargs = OmegaConf.to_object(yaml_kwargs)
     run_config = RunConfig(**kwargs)
     model = SCWrapper(
-        model_class=model_names[run_config.model_config.method]
+        model_class=model_names[run_config.model_config.name]
     )
 
     trainer = BaseTrainer(

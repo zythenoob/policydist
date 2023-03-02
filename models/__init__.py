@@ -3,16 +3,17 @@ from abc import abstractmethod
 import numpy as np
 from torch import nn
 
-from modules.memory import ReservoirBuffer
+from modules.memory import ReservoirBuffer, FIFOBuffer, PrioritizedFIFOBuffer
 
 
 class BaseModel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.memory = ReservoirBuffer(config.buffer_size)
+        self.memory = PrioritizedFIFOBuffer(config.buffer_size)
         self.replay_size = config.replay_size
 
         self.action_space = np.arange(config.backbone_config.output_dim)
+        self.updates = 0
         pass
 
     @abstractmethod

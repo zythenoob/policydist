@@ -36,7 +36,7 @@ class QNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.feature_extractor = None
-        qnet_input_size = config.input_dim[0] + config.output_dim[0]
+        qnet_input_size = config.input_dim[0] + config.output_dim
         self.Q1 = get_backbone("linear", qnet_input_size, 1)
         self.Q2 = get_backbone("linear", qnet_input_size, 1)
 
@@ -47,58 +47,60 @@ class QNetwork(nn.Module):
         return q1, q2
 
 
-class GaussianPolicy(nn.Module):
+class ValueNetwork(nn.Module):
     def __init__(self, config):
-        super(GaussianPolicy, self).__init__()
-        action_space = config.action_space
+        super(ValueNetwork, self).__init__()
         input_dim = config.input_dim[0]
-        output_dim = config.output_dim[0]
-        hidden_dim = 100
-
-        self.linear1 = nn.Linear(input_dim, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-
-        self.mean_linear = nn.Linear(hidden_dim, output_dim)
-        self.log_std_linear = nn.Linear(hidden_dim, output_dim)
-
-        self.apply(weights_init_)
-
-        # action rescaling
-        if action_space is None:
-            self.action_scale = torch.tensor(1.)
-            self.action_bias = torch.tensor(0.)
-        else:
-            self.action_scale = torch.FloatTensor(
-                (action_space.high - action_space.low) / 2.)
-            self.action_bias = torch.FloatTensor(
-                (action_space.high + action_space.low) / 2.)
+        self.net = get_backbone("linear", input_dim, 1)
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
-        mean = self.mean_linear(x)
-        log_std = self.log_std_linear(x)
-        log_std = torch.clamp(log_std, min=-20, max=2)
-        return mean, log_std
+        return self.net(state)
 
-    def sample(self, state):
-        mean, log_std = self.forward(state)
+
+class SoftQNetwork(nn.Module):
+    def __init__(self, config):
+        super(SoftQNetwork, self).__init__()
+        input_dim = config.input_dim[0] + config.output_dim
+        self.net = get_backbone("linear", input_dim, 1)
+
+    def forward(self, state, action):
+        x = torch.cat([state, action], dim=1)
+        x = self.net(x)
+        return x
+
+
+class PolicyNetwork(nn.Module):
+    def __init__(self, config, log_std_min=-20, log_std_max=2):
+        super(PolicyNetwork, self).__init__()
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        hidden_size = 100
+        input_dim = config.input_dim[0]
+        output_dim = config.output_dim
+
+        self.net = get_backbone("linear", input_dim, hidden_size)
+        self.mean_linear = nn.Linear(hidden_size, output_dim)
+        self.log_std_linear = nn.Linear(hidden_size, output_dim)
+
+    def forward(self, state, epsilon=1e-6):
+        feats = self.net(state)
+
+        mean = self.mean_linear(feats)
+        log_std = self.log_std_linear(feats)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+
         std = log_std.exp()
         normal = Normal(mean, std)
-        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
-        log_prob = normal.log_prob(x_t)
-        # Enforcing Action Bound
-        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + 1e-8)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean = torch.tanh(mean) * self.action_scale + self.action_bias
-        return action, log_prob, mean
+        z = normal.sample()
+        action = torch.tanh(z)
+        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon)
+        log_prob = log_prob.sum(-1, keepdim=True)
 
-    def to(self, device):
-        self.action_scale = self.action_scale.to(device)
-        self.action_bias = self.action_bias.to(device)
-        return super(GaussianPolicy, self).to(device)
+        return action, log_prob, z, mean, log_std
+
+    def sample_action(self, state):
+        action, *_ = self.forward(state)
+        return action
 
 
 def get_backbone(name, input_dim, output_dim):

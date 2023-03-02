@@ -12,6 +12,7 @@ from trainer.config.run import RunConfigBase
 from configs import ModelConfig, TrainConfig
 from dataset import RLDataset
 from models import BaseModel
+from modules.evaluation import PDMetrics
 
 np.seterr(all="raise")
 
@@ -45,7 +46,7 @@ class SCWrapper(ModelWrapper):
         self.val_tasks: List[Dataset] = []
 
     def _total_steps(self):
-        return self.train_config.expert_epochs * self.epoch_len
+        return self.train_config.online_max_iters
 
     def config_parser(self, config: RunConfig):
         config = super().config_parser(config)
@@ -56,25 +57,24 @@ class SCWrapper(ModelWrapper):
 
     @property
     def epoch_len(self):
-        return len(self.train_dataloader)
+        return self.train_config.online_max_iters
 
     @property
     def log_itr(self):
         return 1
 
     def evaluation_functions(self) -> Optional[Dict[str, Callable]]:
-        return {"acc": accuracy_score}
+        return None
 
     def train_loop(self):
-        # self.metrics = SCMetrics(
-        #     manual_switch=self.train_config.manual_switch,
-        #     epochs=self.train_config.expert_epochs,
-        #     total_steps=self._total_steps(),
-        #     moving_average_limit=self.epoch_len,
-        #     lr=self.run_config.train_config.optimizer_config.lr,
-        #     evaluation_functions=self.evaluation_functions(),
-        #     batch_limit=float("inf"),
-        # )
+        self.metrics = PDMetrics(
+            epochs=self.train_config.online_max_iters,
+            total_steps=self._total_steps(),
+            moving_average_limit=self.epoch_len,
+            lr=self.run_config.train_config.optimizer_config.lr,
+            evaluation_functions=self.evaluation_functions(),
+            batch_limit=float("inf"),
+        )
 
         self.train_tqdm = tqdm(
             total=self.epoch_len,
@@ -94,7 +94,6 @@ class SCWrapper(ModelWrapper):
 
     def log_step(self):
         super().log_step()
-        # tensorboard_log_step(self.logger, self.metrics, self.model, self.iteration)
 
     def train_online(self):
         # train model
@@ -103,24 +102,39 @@ class SCWrapper(ModelWrapper):
         max_iters = self.train_config.online_max_iters
 
         env = self.train_dataloader.get_dataloader()
+        trajectory_id = 0
         model.train()
 
-        state, info = env.reset()
+        state = env.reset()
         for iter in range(max_iters):
             # observe
             action = model.observe(state)
-            next_state, reward, terminate, _ = env.step(action)
+            next_state, reward, terminate = env.step(action.numpy()[0])
 
             model.memory.add_data(state, action, reward, next_state, terminate)
 
+            loss = 0.0
             if iter > start_iter:
                 batch = model.replay()
                 _, _, loss, _ = self.train_step(batch)
+                model.updates += 1
+
+            aux_metrics = dict(rewards=reward[0], traj_names=str(trajectory_id))
+            self.metrics.append_train(
+                pred=None, labels=None, loss=loss, aux_metrics=aux_metrics
+            )
+            self.metrics.eval_metrics("train")
 
             state = next_state.clone()
             if terminate:
-                state, _ = env.reset()
+                state = env.reset()
+                trajectory_id += 1
             self.update_tqdm()
+
+            if iter % 500 == 0:
+                msg = self.metrics.get_msg()
+                self.log_step()
+                self.logger.info(f"Step [{iter}] {msg}", to_console=False)
 
     def train_offline(self):
         raise NotImplementedError

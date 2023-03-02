@@ -4,55 +4,65 @@ from torch import nn
 import torch.nn.functional as F
 
 from models import BaseModel
-from modules.backbone import GaussianPolicy, QNetwork
-from modules.utls import hard_update
+from modules.backbone import ValueNetwork, SoftQNetwork, PolicyNetwork
+from modules.utls import hard_update, soft_update
 
 
 class SAC(BaseModel):
     def __init__(self, config):
         super().__init__(config)
-        self.policy = GaussianPolicy(config)
-        self.critic = QNetwork(config)
-        self.critic_target = QNetwork(config)
-        hard_update(self.critic_target, self.critic)
+        self.value_net = ValueNetwork(config.backbone_config)
+        self.target_value_net = ValueNetwork(config.backbone_config)
+        hard_update(self.target_value_net, self.value_net)
+
+        self.soft_q_net = SoftQNetwork(config.backbone_config)
+        self.policy_net = PolicyNetwork(config.backbone_config)
 
         self.gamma = config.discount_factor
-        self.epsilon = config.epsilon
+        self.tau = config.soft_update_factor
         self.target_update_freq = config.target_update_freq
 
-        self.loss = nn.SmoothL1Loss()
-
+    @torch.no_grad()
     def observe(self, state):
-        if self.training:
-            action, _, _ = self.policy.sample(state)
-        else:
-            _, _, action = self.policy.sample(state)
-        return action.detach().cpu().numpy()[0]
+        self.policy_net.eval()
+        state = state.to(self.device)
+        action = self.policy_net.sample_action(state)
+        self.policy_net.train()
+        return action.detach().cpu()
 
     def forward(self, states, actions, next_states, rewards, masks):
-        with torch.no_grad():
-            next_state_action, next_state_log_pi, _ = self.policy.sample(next_states)
-            qf1_next_target, qf2_next_target = self.critic_target(next_states, next_state_action)
-            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
-            next_q_value = rewards + masks * self.gamma * min_qf_next_target
+        states, actions, next_states, rewards, masks = (
+            states.to(self.device),
+            actions.to(self.device),
+            next_states.to(self.device),
+            rewards.unsqueeze(1).to(self.device),
+            masks.unsqueeze(1).to(self.device),
+        )
 
-        # Two Q-functions to mitigate positive bias in the policy improvement step
-        qf1, qf2 = self.critic(states, actions)
-        qf1_loss = F.mse_loss(qf1, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        qf2_loss = F.mse_loss(qf2, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
-        qf_loss = qf1_loss + qf2_loss
+        expected_q_value = self.soft_q_net(states, actions)
+        expected_value = self.value_net(states)
+        new_action, log_prob, z, mean, log_std = self.policy_net(states)
 
-        pi, log_pi, _ = self.policy.sample(states)
-        qf1_pi, qf2_pi = self.critic(states, pi)
-        min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
-        policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
-        loss = qf_loss + policy_loss
+        target_value = self.target_value_net(next_states)
+        next_q_value = rewards + (1 - masks) * self.gamma * target_value
+        q_value_loss = F.mse_loss(expected_q_value, next_q_value.detach())
 
-        if updates % self.target_update_interval == 0:
-            soft_update(self.critic_target, self.critic, self.tau)
+        expected_new_q_value = self.soft_q_net(states, new_action)
+        next_value = expected_new_q_value - log_prob
+        value_loss = F.mse_loss(expected_value, next_value.detach())
+
+        log_prob_target = expected_new_q_value - expected_value
+        policy_loss = (log_prob * (log_prob - log_prob_target).detach()).mean()
+
+        # regularization
+        # mean_loss = mean_lambda * mean.pow(2).mean()
+        # std_loss = std_lambda * log_std.pow(2).mean()
+        # z_loss = z_lambda * z.pow(2).sum(1).mean()
+        # policy_loss += mean_loss + std_loss + z_loss
+
+        if self.updates % self.target_update_freq == 0:
+            soft_update(self.target_value_net, self.value_net, self.tau)
+
+        loss = q_value_loss + value_loss + policy_loss
 
         return None, loss
-
-
-
