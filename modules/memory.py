@@ -174,13 +174,31 @@ class PrioritizedFIFOBuffer(Buffer):
             self.step()
 
 
-class ReservoirBuffer(Buffer):
+class PDBuffer(Buffer):
     """
     Random Buffer
     """
 
-    def __init__(self, config, device='cpu'):
+    def __init__(self, config, seq_len, device='cpu'):
         super().__init__(config, device)
+        self.seq_len = seq_len
+
+    def init_tensors(self, states: torch.Tensor, actions: torch.Tensor,
+                     rewards: torch.Tensor, next_states: torch.Tensor,
+                     masks: torch.Tensor) -> None:
+        """
+        Initializes just the required tensors.
+        :param examples: tensor containing the images
+        :param labels: tensor containing the labels
+        :param logits: tensor containing the outputs of the network
+        :param task_labels: tensor containing the task labels
+        """
+        for attr_str in self.attributes:
+            attr = eval(attr_str)
+            if attr is not None and not hasattr(self, attr_str):
+                typ = torch.int64 if attr_str in ['masks'] else torch.float32
+                setattr(self, attr_str, torch.zeros((self.buffer_size, self.seq_len,
+                                                     *attr.shape[1:]), dtype=typ, device=self.device))
 
     def add_data(self, states: torch.Tensor, actions: torch.Tensor,
                  rewards: torch.Tensor, next_states: torch.Tensor,
@@ -200,3 +218,6 @@ class ReservoirBuffer(Buffer):
                 self.rewards[index] = rewards[i].to(self.device)
                 self.next_states[index] = next_states[i].to(self.device)
                 self.masks[index] = masks[i].to(self.device)
+
+
+

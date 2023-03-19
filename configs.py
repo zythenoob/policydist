@@ -34,11 +34,8 @@ class ModelConfig(ModelConfigBase):
 class TrainConfig(TrainConfigBase):
     # data
     dataset: str = "mnist"
-    dataset_type: str = "online"
     env_seed: int = -1
     dataset_root_path: str = "./data"
     device: str = "cuda:0"
     # train
-    online_start_iter: int = 1000
-    online_max_iters: int = 1e+6
-    offline_epochs: int = 10
+    max_episodes: int = 1000

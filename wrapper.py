@@ -29,7 +29,7 @@ def collate_fn(p):
     return p
 
 
-class SCWrapper(ModelWrapper):
+class PDWrapper(ModelWrapper):
     def __init__(self, *args, **kwargs):
 
         super().__init__(
@@ -39,14 +39,13 @@ class SCWrapper(ModelWrapper):
         self.train_config: TrainConfig
         self.model_config: ModelConfig
         self.model: BaseModel
-        # self.metrics: SCMetrics
 
         self.train_dataloader: RLDataset
         self.test_dataloader: None
         self.val_tasks: List[Dataset] = []
 
     def _total_steps(self):
-        return self.train_config.online_max_iters
+        return self.train_config.max_episodes
 
     def config_parser(self, config: RunConfig):
         config = super().config_parser(config)
@@ -57,7 +56,7 @@ class SCWrapper(ModelWrapper):
 
     @property
     def epoch_len(self):
-        return self.train_config.online_max_iters
+        return self.train_config.max_episodes
 
     @property
     def log_itr(self):
@@ -68,7 +67,7 @@ class SCWrapper(ModelWrapper):
 
     def train_loop(self):
         self.metrics = PDMetrics(
-            epochs=self.train_config.online_max_iters,
+            epochs=self.train_config.max_episodes,
             total_steps=self._total_steps(),
             moving_average_limit=self.epoch_len,
             lr=self.run_config.train_config.optimizer_config.lr,
@@ -84,12 +83,7 @@ class SCWrapper(ModelWrapper):
             dynamic_ncols=True,
         )
 
-        if self.train_dataloader.type == "online":
-            self.train_online()
-        elif self.train_dataloader.type == "offline":
-            self.train_offline()
-        else:
-            raise NotImplementedError
+        self.train_online()
         return self.metrics
 
     def log_step(self):
@@ -98,74 +92,56 @@ class SCWrapper(ModelWrapper):
     def train_online(self):
         # train model
         model = self.model
-        start_iter = self.train_config.online_start_iter
-        max_iters = self.train_config.online_max_iters
+        max_episodes = self.train_config.max_episodes
 
+        for ep in range(max_episodes):
+            # train
+            model.student.train()
+            model.teacher.reset()
+            self.run_episode(tag="train", episode_id=ep)
+
+            # eval
+            if ep % 10 == 0:
+                model.student.eval()
+                self.metrics.get_preds("val").reset()
+                for val_ep in range(10):
+                    self.run_episode(tag="val", episode_id=val_ep)
+
+                msg = self.metrics.get_msg()
+                self.log_step()
+                self.logger.info(f"Step [{ep}] {msg}", to_console=True)
+                model.student.train()
+
+            self.update_tqdm()
+
+    def run_episode(self, tag, episode_id):
+        model = self.model
         env = self.train_dataloader.get_dataloader()
-        trajectory_id = 0
-        model.train()
+        max_iter = 1000
 
         state = env.reset()
-        for iter in range(max_iters):
+        for i in range(max_iter):
             # observe
-            action = model.observe(state)
+            action = model.observe(state, tag)
             next_state, reward, terminate = env.step(action.numpy()[0])
 
-            model.memory.add_data(state, action, reward, next_state, terminate)
-
             loss = 0.0
-            if iter > start_iter:
+            if tag == "train":
+                model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
                 batch = model.replay()
                 _, _, loss, _ = self.train_step(batch)
                 model.updates += 1
 
-            aux_metrics = dict(rewards=reward[0], traj_names=str(trajectory_id))
-            self.metrics.append_train(
-                pred=None, labels=None, loss=loss, aux_metrics=aux_metrics
+            aux_metrics = dict(rewards=reward[0], traj_names=str(episode_id))
+            self.metrics.append(
+                pred=None, labels=None, loss=loss, aux_metrics=aux_metrics, tag=tag,
             )
-            self.metrics.eval_metrics("train")
 
             state = next_state.clone()
             if terminate:
-                state = env.reset()
-                trajectory_id += 1
-            self.update_tqdm()
+                break
 
-            if iter % 500 == 0:
-                msg = self.metrics.get_msg()
-                self.log_step()
-                self.logger.info(f"Step [{iter}] {msg}", to_console=False)
-
-    def train_offline(self):
-        raise NotImplementedError
-        # train model
-        model = self.model
-        epochs = self.train_config.offline_epochs
-        trajectory_loader = self.train_dataloader.get_dataloader()
-
-        # for debugging
-        print()
-        print()
-        print(self.train_dataloader.name, "Length:", len(trajectory_loader))
-
-        # TODO Do not current_iteration because it affects logger. TQDM issue... Find a way around this
-        # TODO 2: TQDM is messed up, why is that? has to do with epoch_len
-        self.metrics.current_task_iteration = 0
-        for e in range(epochs):
-            model.train()
-            for i, batch in enumerate(trajectory_loader):
-                preds, labels, loss, _ = self.train_step(batch)
-
-                # aux_metrics = dict(
-                #     context_switch=model.surprise_state,
-                #     score=model.surprise_score,
-                #     ds_name=ds_name,
-                #     warm_up=model.warmup,
-                # )
-                self.metrics.append_train(preds, labels, loss)
-                self.update_tqdm()
-
-            self.train_tqdm.reset()
+        self.metrics.eval_metrics(tag)
 
     def make_dataloader_val(self, run_config: RunConfig):
         return None  # not a good idea to return wrong information i.e. train dataloader. Better to raise an error

@@ -5,10 +5,10 @@ from torch.distributions import Normal
 
 
 # Initialize Policy weights
-def weights_init_(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight, gain=1)
-        torch.nn.init.constant_(m.bias, 0)
+def _weight_init(module):
+    if isinstance(module, nn.Linear):
+        nn.init.xavier_uniform_(module.weight)
+        module.bias.data.zero_()
 
 
 class MLP(nn.Module):
@@ -81,8 +81,9 @@ class PolicyNetwork(nn.Module):
         self.net = get_backbone("linear", input_dim, hidden_size)
         self.mean_linear = nn.Linear(hidden_size, output_dim)
         self.log_std_linear = nn.Linear(hidden_size, output_dim)
+        self.apply(_weight_init)
 
-    def forward(self, state, epsilon=1e-6):
+    def forward(self, state):
         feats = self.net(state)
 
         mean = self.mean_linear(feats)
@@ -90,17 +91,12 @@ class PolicyNetwork(nn.Module):
         log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
 
         std = log_std.exp()
-        normal = Normal(mean, std)
-        z = normal.sample()
-        action = torch.tanh(z)
-        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon)
-        log_prob = log_prob.sum(-1, keepdim=True)
 
-        return action, log_prob, z, mean, log_std
+        return Normal(mean, std)
 
     def sample_action(self, state):
-        action, *_ = self.forward(state)
-        return action
+        distribution = self.forward(state)
+        return distribution.sample()
 
 
 def get_backbone(name, input_dim, output_dim):

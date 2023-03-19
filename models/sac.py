@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from models import BaseModel
 from modules.backbone import ValueNetwork, SoftQNetwork, PolicyNetwork
-from modules.utls import hard_update, soft_update
+from modules.utils import hard_update, soft_update
 
 
 class SAC(BaseModel):

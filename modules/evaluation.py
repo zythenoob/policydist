@@ -60,13 +60,14 @@ class PDMetrics(Metrics):
         aux_metrics = {}
         for k in self.__dict__.keys():
             if k.endswith("_arr__"):
-                tag, *name, _ = k.split("_")[2:-2]
-                name = "_".join(name)
-                aux_metrics[name] = self.get_arr(f"{tag}_{name}").arr
+                _tag, *name, _ = k.split("_")[2:-2]
+                if _tag == tag:
+                    name = "_".join(name)
+                    aux_metrics[name] = self.get_arr(f"{tag}_{name}").arr
 
-        self.update(self._make_aux_metrics(**aux_metrics))
+        self.update(self._make_aux_metrics(tag, **aux_metrics))
 
-    def _make_aux_metrics(self, rewards, traj_names, **kwargs):
+    def _make_aux_metrics(self, tag, rewards, traj_names, **kwargs):
         rewards = np.array(rewards)
         traj_switch_idx = np.nonzero(np.array(traj_names[1:]) != np.array(traj_names[:-1]))[0]
         cutoff = 10
@@ -76,6 +77,7 @@ class PDMetrics(Metrics):
         if len(traj_switch_idx) > 0:
             avg_reward = np.sum(rewards[traj_switch_idx[0]:]) / len(traj_switch_idx)
 
-        return dict(
-            avg_reward=avg_reward,
-        )
+        return {
+            f'{tag}_reward': avg_reward,
+        }
+
