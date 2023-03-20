@@ -18,13 +18,14 @@ class PD(BaseModel):
         self.teacher = DTModel(config)
         self.student = PolicyNetwork(config.backbone_config)
 
+        self.teacher_smooth_factor = config.teacher_smooth_factor
+        self.teacher_std = config.teacher_std
+
     @torch.no_grad()
     def observe(self, state, tag):
         if tag == "train":
             return self.teacher.observe(state).cpu()
         else:
-            # for computing loss
-            self.teacher.observe(state)
             # use student action
             state = state.to(self.device)
             action = self.student.sample_action(state)
@@ -32,18 +33,18 @@ class PD(BaseModel):
 
     def forward(self, states, actions, **kwargs):
         # https://github.com/CUN-bjy/policy-distillation-baselines/blob/main/classroom.py
-        states, t_mean = states.to(self.device), actions.to(self.device)
+        states = states.to(self.device)
         # get student action distribution
         s_dist = self.student(states)
         loss = self.compute_loss(s_dist, actions)
         return None, loss
 
     def compute_loss(self, s_dist, actions):
-        t_mean = actions.to(self.device)
-        # deterministic
+        t_mean = actions.to(self.device) / self.teacher_smooth_factor
         s_mean, s_std = s_dist.loc, s_dist.scale
-        deterministic_std = torch.ones(actions.shape[-1]) * 1e-6
-        t_std = torch.stack([deterministic_std for _ in range(actions.shape[0])]).to(self.device)
+        # fake teacher std
+        t_std = torch.ones(actions.shape[-1]) * self.teacher_std
+        t_std = torch.stack([t_std for _ in range(actions.shape[0])]).to(self.device)
         return kl_div_kd_loss([t_mean, t_std], [s_mean, s_std])
 
     def add_data(self, **kwargs):

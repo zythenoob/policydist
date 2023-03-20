@@ -17,17 +17,20 @@ class ModelConfig(ModelConfigBase):
     name: str
     buffer_size: int = 1e+5
     replay_size: int = 200
-    # reward discount
-    discount_factor: float = 0.99
-    epsilon: float = 0.1
-    # sac
-    soft_update_factor: float = 0.005
-    target_update_freq: int = 1000
-    temperature: float = 0.2
+    # pd
+    teacher_smooth_factor: float = 1.0
+    teacher_std: float = 0.1
+
+    # # reward discount
+    # discount_factor: float = 0.99
+    # epsilon: float = 0.1
+    # # sac
+    # soft_update_factor: float = 0.005
+    # target_update_freq: int = 1000
+    # temperature: float = 0.2
 
     # backbone
     backbone_config: trainer.Annotated[Optional[BackboneConfig], trainer.Derived] = None
-    pass
 
 
 @trainer.configclass
@@ -39,3 +42,5 @@ class TrainConfig(TrainConfigBase):
     device: str = "cuda:0"
     # train
     max_episodes: int = 1000
+    val_episodes: int = 10
+    train_iter: int = 100

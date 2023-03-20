@@ -5,12 +5,12 @@ import torch.nn.functional as F
 
 from models import BaseModel
 from modules.backbone import ValueNetwork, SoftQNetwork, PolicyNetwork
-from modules.utils import hard_update, soft_update
 
 
 class SAC(BaseModel):
     def __init__(self, config):
         super().__init__(config)
+        raise NotImplementedError
         self.value_net = ValueNetwork(config.backbone_config)
         self.target_value_net = ValueNetwork(config.backbone_config)
         hard_update(self.target_value_net, self.value_net)

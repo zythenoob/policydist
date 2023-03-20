@@ -8,9 +8,10 @@ from typing import List
 class PDMetrics(Metrics):
     current_task_iteration: int = 0
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, val_trials, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.n_tasks = 0
+        self.val_trials = val_trials
 
     def eval_best(self, div_factor, div_warm_up_steps):
         is_best = False
@@ -42,8 +43,8 @@ class PDMetrics(Metrics):
         msg = f"Training - " f"{base_msg} {aux_msg} "
         return msg
 
-    def append(self, pred, labels, tag, loss=None, aux_metrics=None):
-        super().append(pred, labels, tag, loss, aux_metrics)
+    def append(self, tag, pred=None, labels=None, loss=None, aux_metrics=None):
+        super().append(None, None, tag, loss, aux_metrics)
         if aux_metrics is not None:
             limits = []
             for k, v in aux_metrics.items():
@@ -70,7 +71,7 @@ class PDMetrics(Metrics):
     def _make_aux_metrics(self, tag, rewards, traj_names, **kwargs):
         rewards = np.array(rewards)
         traj_switch_idx = np.nonzero(np.array(traj_names[1:]) != np.array(traj_names[:-1]))[0]
-        cutoff = 10
+        cutoff = 10 if tag == "train" else self.val_trials
         # avg reward of last 10 trajectories in training
         traj_switch_idx = traj_switch_idx[-cutoff:]
         avg_reward = 0

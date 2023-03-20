@@ -73,6 +73,7 @@ class PDWrapper(ModelWrapper):
             lr=self.run_config.train_config.optimizer_config.lr,
             evaluation_functions=self.evaluation_functions(),
             batch_limit=float("inf"),
+            val_trials=self.run_config.train_config.val_episodes,
         )
 
         self.train_tqdm = tqdm(
@@ -93,6 +94,7 @@ class PDWrapper(ModelWrapper):
         # train model
         model = self.model
         max_episodes = self.train_config.max_episodes
+        val_episodes = self.train_config.val_episodes
 
         for ep in range(max_episodes):
             # train
@@ -101,10 +103,10 @@ class PDWrapper(ModelWrapper):
             self.run_episode(tag="train", episode_id=ep)
 
             # eval
-            if ep % 10 == 0:
+            if ep % 1 == 0:
                 model.student.eval()
                 self.metrics.get_preds("val").reset()
-                for val_ep in range(10):
+                for val_ep in range(val_episodes):
                     self.run_episode(tag="val", episode_id=val_ep)
 
                 msg = self.metrics.get_msg()
@@ -118,28 +120,28 @@ class PDWrapper(ModelWrapper):
         model = self.model
         env = self.train_dataloader.get_dataloader()
         max_iter = 1000
+        train_iter = self.train_config.train_iter
 
         state = env.reset()
         for i in range(max_iter):
             # observe
             action = model.observe(state, tag)
             next_state, reward, terminate = env.step(action.numpy()[0])
-
-            loss = 0.0
             if tag == "train":
                 model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
-                batch = model.replay()
-                _, _, loss, _ = self.train_step(batch)
-                model.updates += 1
-
             aux_metrics = dict(rewards=reward[0], traj_names=str(episode_id))
-            self.metrics.append(
-                pred=None, labels=None, loss=loss, aux_metrics=aux_metrics, tag=tag,
-            )
-
+            self.metrics.append(aux_metrics=aux_metrics, tag=tag)
             state = next_state.clone()
             if terminate:
                 break
+
+        # train
+        if tag == "train":
+            for _ in range(train_iter):
+                batch = model.replay()
+                _, _, loss, _ = self.train_step(batch)
+                model.updates += 1
+                self.metrics.append(loss=loss, tag=tag)
 
         self.metrics.eval_metrics(tag)
 
