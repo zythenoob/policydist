@@ -32,6 +32,19 @@ class BaseModel(nn.Module):
     def add_data(self, **kwargs):
         self.memory.add_data(**kwargs)
 
+    def set_train(self):
+        if hasattr(self, "teacher"):
+            self.student.train()
+            self.teacher.reset()
+        else:
+            self.train()
+
+    def set_eval(self):
+        if hasattr(self, "teacher"):
+            self.student.eval()
+        else:
+            self.eval()
+
 
 class DTModel(BaseModel):
     SCALE = 1000.0  # normalization for rewards/returns
@@ -40,7 +53,7 @@ class DTModel(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.memory = None
-        self.model = DecisionTransformerModel.from_pretrained("edbeeching/decision-transformer-gym-hopper-medium")
+        self.model = get_pretrained_DTModel(config.backbone_config.dataset_name)
         self.model.eval()
         # sequence
         self.step = 0
@@ -159,3 +172,9 @@ class DTModel(BaseModel):
 
         return action_preds[0, -1]
 
+
+def get_pretrained_DTModel(name):
+    if name == "hopper":
+        return DecisionTransformerModel.from_pretrained("edbeeching/decision-transformer-gym-hopper-medium")
+    else:
+        raise NotImplementedError

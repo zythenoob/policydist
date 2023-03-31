@@ -10,6 +10,7 @@ class BackboneConfig(ModelConfigBase):
     input_dim: List[int]
     output_dim: int
     action_space = None
+    dataset_name: str
 
 
 @trainer.configclass
@@ -17,25 +18,21 @@ class ModelConfig(ModelConfigBase):
     name: str
     buffer_size: int = 1e+5
     replay_size: int = 200
-    # reward discount
-    discount_factor: float = 0.99
-    epsilon: float = 0.1
-    # sac
-    soft_update_factor: float = 0.005
-    target_update_freq: int = 1000
-    temperature: float = 0.2
+    teacher_smooth_factor: float = 1.0
+    teacher_std: float = 0.01
 
     # backbone
     backbone_config: trainer.Annotated[Optional[BackboneConfig], trainer.Derived] = None
-    pass
 
 
 @trainer.configclass
 class TrainConfig(TrainConfigBase):
     # data
-    dataset: str = "mnist"
+    dataset: Literal["hopper", "pong"] = "hopper"
     env_seed: int = -1
     dataset_root_path: str = "./data"
     device: str = "cuda:0"
     # train
     max_episodes: int = 1000
+    val_episodes: int = 100
+    train_iter: int = 100

@@ -3,8 +3,6 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import trainer
-from sklearn.metrics import accuracy_score
-from torch.utils.data import ConcatDataset, Dataset
 from tqdm import tqdm
 from trainer import ModelWrapper
 from trainer.config.run import RunConfigBase
@@ -13,6 +11,7 @@ from configs import ModelConfig, TrainConfig
 from dataset import RLDataset
 from models import BaseModel
 from modules.evaluation import PDMetrics
+from utils import get_dataset
 
 np.seterr(all="raise")
 
@@ -42,7 +41,6 @@ class PDWrapper(ModelWrapper):
 
         self.train_dataloader: RLDataset
         self.test_dataloader: None
-        self.val_tasks: List[Dataset] = []
 
     def _total_steps(self):
         return self.train_config.max_episodes
@@ -50,7 +48,7 @@ class PDWrapper(ModelWrapper):
     def config_parser(self, config: RunConfig):
         config = super().config_parser(config)
         config.model_config.backbone_config = (
-            self.train_dataloader.make_backbone_config()
+            self.train_dataloader.backbone_config
         )
         return config
 
@@ -73,6 +71,7 @@ class PDWrapper(ModelWrapper):
             lr=self.run_config.train_config.optimizer_config.lr,
             evaluation_functions=self.evaluation_functions(),
             batch_limit=float("inf"),
+            val_trials=self.run_config.train_config.val_episodes,
         )
 
         self.train_tqdm = tqdm(
@@ -93,53 +92,52 @@ class PDWrapper(ModelWrapper):
         # train model
         model = self.model
         max_episodes = self.train_config.max_episodes
+        val_episodes = self.train_config.val_episodes
 
         for ep in range(max_episodes):
             # train
-            model.student.train()
-            model.teacher.reset()
+            model.set_train()
             self.run_episode(tag="train", episode_id=ep)
 
             # eval
-            if ep % 10 == 0:
-                model.student.eval()
+            if ep % 1 == 0:
+                model.set_eval()
                 self.metrics.get_preds("val").reset()
-                for val_ep in range(10):
+                for val_ep in range(val_episodes):
                     self.run_episode(tag="val", episode_id=val_ep)
 
                 msg = self.metrics.get_msg()
                 self.log_step()
                 self.logger.info(f"Step [{ep}] {msg}", to_console=True)
-                model.student.train()
 
             self.update_tqdm()
 
     def run_episode(self, tag, episode_id):
         model = self.model
         env = self.train_dataloader.get_dataloader()
-        max_iter = 1000
+        max_iter = self.train_dataloader.max_steps
+        train_iter = self.train_config.train_iter
 
         state = env.reset()
         for i in range(max_iter):
             # observe
             action = model.observe(state, tag)
             next_state, reward, terminate = env.step(action.numpy()[0])
-
-            loss = 0.0
             if tag == "train":
                 model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
-                batch = model.replay()
-                _, _, loss, _ = self.train_step(batch)
-                model.updates += 1
-
             aux_metrics = dict(rewards=reward[0], traj_names=str(episode_id))
-            self.metrics.append(
-                pred=None, labels=None, loss=loss, aux_metrics=aux_metrics, tag=tag,
-            )
-
+            self.metrics.append(aux_metrics=aux_metrics, tag=tag)
             state = next_state.clone()
             if terminate:
                 break
+
+        # train
+        if tag == "train":
+            for _ in range(train_iter):
+                batch = model.replay()
+                _, _, loss, _ = self.train_step(batch)
+                self.metrics.append(loss=loss, tag=tag)
+                model.updates += 1
 
         self.metrics.eval_metrics(tag)
 
@@ -147,4 +145,4 @@ class PDWrapper(ModelWrapper):
         return None  # not a good idea to return wrong information i.e. train dataloader. Better to raise an error
 
     def make_dataloader_train(self, run_config: RunConfig):
-        return RLDataset(run_config.train_config)
+        return get_dataset(run_config.train_config)

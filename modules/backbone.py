@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -11,7 +13,46 @@ def _weight_init(module):
         module.bias.data.zero_()
 
 
-class MLP(nn.Module):
+class Backbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def _init_weights(self, m):
+
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_normal_(m.weight)
+            if m.bias is not None:
+                m.bias.data.fill_(0.0)
+
+    def get_params(self) -> torch.Tensor:
+        """
+        Returns all the parameters concatenated in a single tensor.
+        :return: parameters tensor (??)
+        """
+        params = []
+        for pp in list(self.parameters()):
+            params.append(pp.view(-1))
+        return torch.cat(params)
+
+    def get_grads(self) -> torch.Tensor:
+        """
+        Returns all the gradients concatenated in a single tensor.
+        :return: gradients tensor (??)
+        """
+        return torch.cat(self.get_grads_list())
+
+    def get_grads_list(self) -> List[torch.Tensor]:
+        """
+        Returns a list containing the gradients (a tensor for each layer).
+        :return: gradients list
+        """
+        grads = []
+        for pp in list(self.parameters()):
+            grads.append(pp.grad.view(-1))
+        return grads
+
+
+class MLP(Backbone):
     def __init__(self, input_dim, output_dim):
         super(MLP, self).__init__()
 
@@ -32,7 +73,7 @@ class MLP(nn.Module):
         return out
 
 
-class QNetwork(nn.Module):
+class QNetwork(Backbone):
     def __init__(self, config):
         super().__init__()
         self.feature_extractor = None
@@ -47,7 +88,7 @@ class QNetwork(nn.Module):
         return q1, q2
 
 
-class ValueNetwork(nn.Module):
+class ValueNetwork(Backbone):
     def __init__(self, config):
         super(ValueNetwork, self).__init__()
         input_dim = config.input_dim[0]
@@ -57,7 +98,7 @@ class ValueNetwork(nn.Module):
         return self.net(state)
 
 
-class SoftQNetwork(nn.Module):
+class SoftQNetwork(Backbone):
     def __init__(self, config):
         super(SoftQNetwork, self).__init__()
         input_dim = config.input_dim[0] + config.output_dim
@@ -69,7 +110,7 @@ class SoftQNetwork(nn.Module):
         return x
 
 
-class PolicyNetwork(nn.Module):
+class PolicyNetwork(Backbone):
     def __init__(self, config, log_std_min=-20, log_std_max=2):
         super(PolicyNetwork, self).__init__()
         self.log_std_min = log_std_min

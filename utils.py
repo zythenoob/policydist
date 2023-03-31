@@ -4,6 +4,7 @@ import importlib
 from pathlib import Path
 
 import models
+from dataset.hopper import Hopper
 
 
 def get_all_models():
@@ -28,3 +29,12 @@ for model in get_all_models():
         model_names[model] = getattr(mod, class_name)
     except:
         logging.warning(f"Could not load a baseline from: {model}")
+
+
+def get_dataset(config):
+    if config.dataset == "hopper":
+        return Hopper(config)
+    elif config.dataset == "pong":
+        return Atari(config)
+    else:
+        raise NotImplementedError

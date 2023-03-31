@@ -42,7 +42,7 @@ class PDMetrics(Metrics):
         msg = f"Training - " f"{base_msg} {aux_msg} "
         return msg
 
-    def append(self, pred, labels, tag, loss=None, aux_metrics=None):
+    def append(self, pred=None, labels=None, tag=None, loss=None, aux_metrics=None):
         super().append(pred, labels, tag, loss, aux_metrics)
         if aux_metrics is not None:
             limits = []
