@@ -71,7 +71,7 @@ class PDWrapper(ModelWrapper):
             lr=self.run_config.train_config.optimizer_config.lr,
             evaluation_functions=self.evaluation_functions(),
             batch_limit=float("inf"),
-            val_trials=self.run_config.train_config.val_episodes,
+            val_episodes=self.run_config.train_config.val_episodes,
         )
 
         self.train_tqdm = tqdm(
