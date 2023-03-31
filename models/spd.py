@@ -26,6 +26,7 @@ class SPD(BaseModel):
             "mu": None,
             "std": None,
         }
+        self.recent_replay_ratio = 0.5
         self.sup_decay = 0.8
         self.threshold = 10.0
 
@@ -79,3 +80,7 @@ class SPD(BaseModel):
         if surprise_score > self.threshold:
             self.surprise_state = True
             self.memory.add_data(states=states, actions=actions, **kwargs)
+
+    def replay(self):
+        recent_samples = int(self.replay_size * self.recent_replay_ratio)
+        return self.memory.get_data(self.replay_size, recent=recent_samples)

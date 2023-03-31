@@ -113,15 +113,25 @@ class Buffer:
         return min(self.num_seen_examples, self.buffer_size)
 
 
-class FIFOBuffer(Buffer):
+class ReservoirBuffer(Buffer):
     def __init__(self, config, device='cpu'):
         super().__init__(config, device)
-        self.store = 0
 
-    def step(self):
-        self.store += 1
-        if self.store >= self.buffer_size:
-            self.store = 0
+    def init_tensors(self, states: torch.Tensor, actions: torch.Tensor,
+                     rewards: torch.Tensor, next_states: torch.Tensor,
+                     masks: torch.Tensor) -> None:
+        """
+        Initializes just the required tensors.
+        :param examples: tensor containing the images
+        :param labels: tensor containing the labels
+        :param logits: tensor containing the outputs of the network
+        :param task_labels: tensor containing the task labels
+        """
+        for attr_str in self.attributes:
+            attr = eval(attr_str)
+            if attr is not None and not hasattr(self, attr_str):
+                typ = torch.int64 if attr_str in ['masks'] else torch.float32
+                setattr(self, attr_str, torch.zeros((self.buffer_size, *attr.shape[1:]), dtype=typ, device=self.device))
 
     def add_data(self, states: torch.Tensor, actions: torch.Tensor,
                  rewards: torch.Tensor, next_states: torch.Tensor,
@@ -133,14 +143,83 @@ class FIFOBuffer(Buffer):
             self.init_tensors(states, actions, rewards, next_states, masks)
 
         for i in range(states.shape[0]):
-            index = self.store
+            index = reservoir(self.num_seen_examples, self.buffer_size)
             self.num_seen_examples += 1
-            self.states[index] = states[i].to(self.device)
-            self.actions[index] = actions[i].to(self.device)
-            self.rewards[index] = rewards[i].to(self.device)
-            self.next_states[index] = next_states[i].to(self.device)
-            self.masks[index] = masks[i].to(self.device)
-            self.step()
+            if index >= 0:
+                self.states[index] = states[i].to(self.device)
+                self.actions[index] = actions[i].to(self.device)
+                self.rewards[index] = rewards[i].to(self.device)
+                self.next_states[index] = next_states[i].to(self.device)
+                self.masks[index] = masks[i].to(self.device)
+
+
+class FIFOBuffer(Buffer):
+    def __init__(self, config, device='cpu'):
+        super().__init__(config, device)
+        self.empty()
+
+    def add_data(self, states: torch.Tensor, actions: torch.Tensor,
+                 rewards: torch.Tensor, next_states: torch.Tensor,
+                 masks: torch.Tensor):
+        """
+        Adds the data to the memory buffer according to the reservoir strategy.
+        """
+
+        for i in range(states.shape[0]):
+            self.num_seen_examples += 1
+            self.states.append(states[i].to(self.device))
+            self.actions.append(actions[i].to(self.device))
+            self.rewards.append(rewards[i].to(self.device))
+            self.next_states.append(next_states[i].to(self.device))
+            self.masks.append(masks[i].to(self.device))
+
+        if len(self.states) > 2 * self.buffer_size:
+            for attr_str in self.attributes:
+                attr = getattr(self, attr_str)
+                setattr(self, attr_str, attr[-self.buffer_size:])
+
+    def empty(self) -> None:
+        """
+        Set all the tensors to None.
+        """
+        for attr_str in self.attributes:
+            setattr(self, attr_str, [])
+        self.num_seen_examples = 0
+
+    def get_data(self, size: int, return_index=False, recent=None) -> Tuple:
+        """
+        Random samples a batch of size items.
+        :param size: the number of requested items
+        :param transform: the transformation to be applied (data augmentation)
+        :return:
+        """
+        recent_size = 0
+        if recent is not None:
+            assert recent > 0
+            recent_size = min(self.num_seen_examples, self.buffer_size, recent)
+
+        if size > min(self.num_seen_examples, self.buffer_size):
+            size = min(self.num_seen_examples, self.buffer_size)
+        size -= recent_size
+
+        choice = []
+        # retrieve recent samples
+        if recent_size > 0:
+            choice.extend(list(np.arange(len(self))[-recent_size:]))
+        # retrieve random samples
+        if size > 0:
+            select_range = len(self) if recent_size == 0 else len(self) - recent_size
+            choice.extend(list(np.random.choice(select_range, size=size, replace=False)))
+
+        ret_tuple = {}
+        for attr_str in self.attributes:
+            if hasattr(self, attr_str):
+                attr = getattr(self, attr_str)[-self.buffer_size:]
+                ret_tuple[attr_str] = torch.stack([attr[c] for c in choice])
+
+        if return_index:
+            ret_tuple['index'] = torch.tensor(choice).to(self.device)
+        return ret_tuple
 
 
 class PrioritizedFIFOBuffer(Buffer):
@@ -174,7 +253,7 @@ class PrioritizedFIFOBuffer(Buffer):
             self.step()
 
 
-class PDBuffer(Buffer):
+class PDBuffer(ReservoirBuffer):
     """
     Random Buffer
     """
@@ -199,25 +278,3 @@ class PDBuffer(Buffer):
                 typ = torch.int64 if attr_str in ['masks'] else torch.float32
                 setattr(self, attr_str, torch.zeros((self.buffer_size, self.seq_len,
                                                      *attr.shape[1:]), dtype=typ, device=self.device))
-
-    def add_data(self, states: torch.Tensor, actions: torch.Tensor,
-                 rewards: torch.Tensor, next_states: torch.Tensor,
-                 masks: torch.Tensor):
-        """
-        Adds the data to the memory buffer according to the reservoir strategy.
-        """
-        if not hasattr(self, 'x'):
-            self.init_tensors(states, actions, rewards, next_states, masks)
-
-        for i in range(states.shape[0]):
-            index = reservoir(self.num_seen_examples, self.buffer_size)
-            self.num_seen_examples += 1
-            if index >= 0:
-                self.states[index] = states[i].to(self.device)
-                self.actions[index] = actions[i].to(self.device)
-                self.rewards[index] = rewards[i].to(self.device)
-                self.next_states[index] = next_states[i].to(self.device)
-                self.masks[index] = masks[i].to(self.device)
-
-
-

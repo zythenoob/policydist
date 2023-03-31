@@ -34,7 +34,5 @@ for model in get_all_models():
 def get_dataset(config):
     if config.dataset == "hopper":
         return Hopper(config)
-    elif config.dataset == "pong":
-        return Atari(config)
     else:
         raise NotImplementedError
