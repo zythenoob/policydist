@@ -55,6 +55,8 @@ class DTModel(BaseModel):
         self.memory = None
         self.model = get_pretrained_DTModel(config.backbone_config.dataset_name)
         self.model.eval()
+
+        print('Num teacher parameters:', sum(p.numel() for p in self.model.parameters() if p.requires_grad))
         # sequence
         self.step = 0
         self.max_seq_len = self.model.config.max_length

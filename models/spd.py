@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from models import BaseModel, DTModel
 from modules.backbone import PolicyNetwork
 from modules.memory import FIFOBuffer
-from modules.utils import mse_kd_loss, kl_div_kd_loss
+from modules.utils import mse_kd_loss, kl_div_kd_loss, z_score
 
 """
     Surprise Policy Distillation
@@ -20,6 +20,14 @@ class SPD(BaseModel):
 
         self.teacher_smooth_factor = config.teacher_smooth_factor
         self.teacher_std = config.teacher_std
+
+        self.surprise_state = False
+        self.surprise_stats = {
+            "mu": None,
+            "std": None,
+        }
+        self.sup_decay = 0.8
+        self.threshold = 10.0
 
     @torch.no_grad()
     def observe(self, state, tag):
@@ -55,6 +63,19 @@ class SPD(BaseModel):
         loss.backward()
         grads = self.student.get_grads_list()
         grad_norm = torch.stack([torch.norm(g) for g in grads])
-        print(grad_norm)
-        assert 0
-        self.memory.add_data(**kwargs)
+        surprise_score = z_score(grad_norm, **self.surprise_stats).abs().max()
+        # update
+        if self.surprise_stats["mu"] is None:
+            self.surprise_stats["mu"] = torch.zeros_like(grad_norm)
+            self.surprise_stats["std"] = torch.ones_like(grad_norm)
+        delta = grad_norm - self.surprise_stats["mu"]
+        delta = delta.clone()
+        self.surprise_stats["mu"] += self.sup_decay * delta
+        self.surprise_stats["std"] = (1 - self.sup_decay) * (
+                self.surprise_stats["std"] + self.sup_decay * delta ** 2
+        )
+        self.student.zero_grad()
+
+        if surprise_score > self.threshold:
+            self.surprise_state = True
+            self.memory.add_data(states=states, actions=actions, **kwargs)

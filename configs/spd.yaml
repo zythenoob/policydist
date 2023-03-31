@@ -1,0 +1,29 @@
+experiment_dir: "/tmp/experiments"
+model_dir: "/tmp/experiments/hopper_sac"
+logger_configs:
+  - name: tensorboard
+train_config:
+  dataset: hopper
+  dataset_root_path: /tmp/data
+  epochs: 1
+  # train
+  max_episodes: 1000
+  val_episodes: 100
+  train_iter: 1
+  batch_size: 64
+  device: cuda:0
+  amp: true
+  debug: true
+  resume: false
+  # optimizer
+  optimizer_config:
+    name: adam
+    arguments:
+      lr: 1e-3
+#      betas: [0.9, 0.999]
+model_config:
+  name: spd
+  buffer_size: 1000
+  replay_size: 128
+  teacher_smooth_factor: 1.0
+  teacher_std: 0.01

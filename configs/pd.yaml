@@ -19,7 +19,7 @@ train_config:
   optimizer_config:
     name: adam
     arguments:
-      lr: 1e-4
+      lr: 1e-3
 #      betas: [0.9, 0.999]
 model_config:
   name: pd

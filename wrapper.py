@@ -10,6 +10,7 @@ from trainer.config.run import RunConfigBase
 from configs import ModelConfig, TrainConfig
 from dataset import RLDataset
 from models import BaseModel
+from models.spd import SPD
 from modules.evaluation import PDMetrics
 from utils import get_dataset
 
@@ -116,7 +117,6 @@ class PDWrapper(ModelWrapper):
         model = self.model
         env = self.train_dataloader.get_dataloader()
         max_iter = self.train_dataloader.max_steps
-        train_iter = self.train_config.train_iter
 
         state = env.reset()
         for i in range(max_iter):
@@ -125,6 +125,10 @@ class PDWrapper(ModelWrapper):
             next_state, reward, terminate = env.step(action.numpy()[0])
             if tag == "train":
                 model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
+                if isinstance(model, SPD) and model.surprise_state:
+                    self.train_student(model)
+                    model.surprise_state = False
+
             aux_metrics = dict(rewards=reward[0], traj_names=str(episode_id))
             self.metrics.append(aux_metrics=aux_metrics, tag=tag)
             state = next_state.clone()
@@ -133,13 +137,18 @@ class PDWrapper(ModelWrapper):
 
         # train
         if tag == "train":
-            for _ in range(train_iter):
-                batch = model.replay()
-                _, _, loss, _ = self.train_step(batch)
-                self.metrics.append(loss=loss, tag=tag)
-                model.updates += 1
-
+            if not isinstance(model, SPD):
+                self.train_student(model)
+            print('total updates:', model.updates)
         self.metrics.eval_metrics(tag)
+
+    def train_student(self, model):
+        train_iter = self.train_config.train_iter
+        for _ in range(train_iter):
+            batch = model.replay()
+            _, _, loss, _ = self.train_step(batch)
+            self.metrics.append(loss=loss, tag="train")
+            model.updates += 1
 
     def make_dataloader_val(self, run_config: RunConfig):
         return None  # not a good idea to return wrong information i.e. train dataloader. Better to raise an error
