@@ -27,3 +27,7 @@ model_config:
   replay_size: 32
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
+  # spd hparams
+  recent_replay_ratio: 0.5
+  sup_decay: 0.8
+  threshold: 10.0

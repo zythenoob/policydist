@@ -24,6 +24,11 @@ class ModelConfig(ModelConfigBase):
     # backbone
     backbone_config: trainer.Annotated[Optional[BackboneConfig], trainer.Derived] = None
 
+    # SPD hparams
+    recent_replay_ratio: float = 0.5
+    sup_decay: float = 0.8
+    threshold: float = 10.0
+
 
 @trainer.configclass
 class TrainConfig(TrainConfigBase):

@@ -26,9 +26,9 @@ class SPD(BaseModel):
             "mu": None,
             "std": None,
         }
-        self.recent_replay_ratio = 0.5
-        self.sup_decay = 0.8
-        self.threshold = 10.0
+        self.recent_replay_ratio = config.recent_replay_ratio
+        self.sup_decay = config.sup_decay
+        self.threshold = config.threshold
 
     @torch.no_grad()
     def observe(self, state, tag):
