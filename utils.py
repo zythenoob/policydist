@@ -3,8 +3,11 @@ import os
 import importlib
 from pathlib import Path
 
+from trainer import SummaryLogger
+
 import models
 from dataset.hopper import Hopper
+from modules.evaluation import PDMetrics
 
 
 def get_all_models():
@@ -36,3 +39,11 @@ def get_dataset(config):
         return Hopper(config)
     else:
         raise NotImplementedError
+
+def tensorboard_log_step(
+    writer: SummaryLogger, metrics: PDMetrics, model: models.BaseModel, iteration: int
+):
+    writer._add_metric(
+        "updates", model.updates, iteration,
+    )
+

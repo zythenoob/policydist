@@ -1,5 +1,5 @@
 experiment_dir: "/tmp/experiments"
-model_dir: "/tmp/experiments/hopper_spd"
+model_dir: "/tmp/experiments/hopper_spd_tune"
 logger_configs:
   - name: tensorboard
 train_config:
@@ -11,9 +11,9 @@ train_config:
   val_episodes: 100
   train_iter: 1
   batch_size: 64
-  device: cuda:0
+  device: cuda
   amp: true
-  debug: true
+  debug: false
   resume: false
   # optimizer
   optimizer_config:
@@ -31,3 +31,14 @@ model_config:
   recent_replay_ratio: 0.5
   sup_decay: 0.8
   threshold: 10.0
+
+tune:
+  model_config.recent_replay_ratio: [ 0, 1.0 ]
+  model_config.sup_decay: [ 0, 1.0 ]
+  model_config.threshold: [ 5, 20 ]
+total_trials: 50
+concurrent_trials: 10
+experiment_type: tpe
+optim_directions: [[val_reward, max]]
+ignore_errored_trials: True
+num_experiment_per_gpu: 5

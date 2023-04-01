@@ -10,8 +10,8 @@ class PDMetrics(Metrics):
 
     def __init__(self, val_episodes, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.n_tasks = 0
         self.val_episodes = val_episodes
+        self.num_updates = 0
 
     def eval_best(self, div_factor, div_warm_up_steps):
         is_best = False

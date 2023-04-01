@@ -12,7 +12,7 @@ from dataset import RLDataset
 from models import BaseModel
 from models.spd import SPD
 from modules.evaluation import PDMetrics
-from utils import get_dataset
+from utils import get_dataset, tensorboard_log_step
 
 np.seterr(all="raise")
 
@@ -107,11 +107,15 @@ class PDWrapper(ModelWrapper):
                 for val_ep in range(val_episodes):
                     self.run_episode(tag="val", episode_id=val_ep)
 
+                self.metrics.eval_metrics('val')
                 msg = self.metrics.get_msg()
-                self.log_step()
                 self.logger.info(f"Step [{ep}] {msg}", to_console=True)
 
+            self.metrics.eval_metrics('train')
+            self.metrics.num_updates = model.updates
             self.update_tqdm()
+            self.log_step()
+            tensorboard_log_step(self.logger, self.metrics, model, self.iteration)
 
     def run_episode(self, tag, episode_id):
         model = self.model
@@ -140,7 +144,6 @@ class PDWrapper(ModelWrapper):
             if not isinstance(model, SPD):
                 self.train_student(model)
             print('total updates:', model.updates)
-        self.metrics.eval_metrics(tag)
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter
