@@ -2,6 +2,8 @@ import argparse
 from pathlib import Path
 from omegaconf import OmegaConf
 from trainer import BaseTrainer, configclass, MPConfig
+from trainer.mp import MPTrainer
+import ray
 
 from configs import ModelConfig, TrainConfig
 from utils import model_names
@@ -14,22 +16,6 @@ class ParallelConfig(MPConfig):
     train_config: TrainConfig
 
 
-def make_trainer_mp(model, **kwargs):
-    from trainer.mp import MPTrainer
-    import ray
-
-    run_config = ParallelConfig(**kwargs)  # type: ignore
-    run_config.train_config.tqdm = False
-    ray.init(
-        address="auto", runtime_env={"working_dir": Path(__file__).parent.resolve()}
-    )
-    return MPTrainer(
-        model=model,
-        run_config=run_config,
-        description="Parallel training experiments",
-    )
-
-
 def my_train(config):
     yaml_kwargs = OmegaConf.load(Path(config).as_posix())
     kwargs = OmegaConf.to_object(yaml_kwargs)
@@ -37,12 +23,21 @@ def my_train(config):
         model_class=model_names[kwargs["model_config"]["name"]]
     )
 
-    trainer = make_trainer_mp(model, **kwargs)
+    run_config = ParallelConfig(**kwargs)  # type: ignore
+    run_config.train_config.tqdm = False
+    ray.init(
+        address="auto", runtime_env={"working_dir": Path(__file__).parent.resolve()}
+    )
+    trainer = MPTrainer(
+        model=model,
+        run_config=run_config,
+        description="Parallel training experiments",
+    )
     trainer.launch()
 
     from trainer.analysis.plot import CustomReport
 
-    report = CustomReport(config)
+    report = CustomReport(run_config)
     report.make()
 
 
