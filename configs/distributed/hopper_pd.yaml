@@ -1,9 +1,9 @@
-experiment_dir: "/tmp/experiments"
-model_dir: "/tmp/experiments/hopper_pd"
+experiment_dir: "/home/ji/experiments"
+model_dir: "/home/ji/experiments/hopper_pd"
 logger_configs:
   - name: tensorboard
 train_config:
-  dataset: walker
+  dataset: hopper
   dataset_root_path: /tmp/data
   epochs: 1
   # train
@@ -11,9 +11,9 @@ train_config:
   val_episodes: 100
   train_iter: 50
   batch_size: 64
-  device: cuda:0
+  device: cuda
   amp: true
-  debug: true
+  debug: false
   resume: false
   # optimizer
   optimizer_config:
@@ -27,3 +27,12 @@ model_config:
   replay_size: 32
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
+
+tune:
+  train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+total_trials: 20
+concurrent_trials: 20
+experiment_type: random
+optim_directions: [[val_reward, max]]
+ignore_errored_trials: True
+num_experiment_per_gpu: 10

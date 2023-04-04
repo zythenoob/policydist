@@ -26,8 +26,6 @@ class PD(BaseModel):
         if tag == "train":
             return self.teacher.observe(state).cpu()
         else:
-            # for computing loss
-            self.teacher.observe(state)
             # use student action
             state = state.to(self.device)
             action = self.student.sample_action(state)
@@ -35,7 +33,7 @@ class PD(BaseModel):
 
     def forward(self, states, actions, **kwargs):
         # https://github.com/CUN-bjy/policy-distillation-baselines/blob/main/classroom.py
-        states, t_mean = states.to(self.device), actions.to(self.device)
+        states = states.to(self.device)
         # get student action distribution
         s_dist = self.student(states)
         loss = self.compute_loss(s_dist, actions)

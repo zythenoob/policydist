@@ -10,7 +10,8 @@ class BackboneConfig(ModelConfigBase):
     input_dim: List[int]
     output_dim: int
     action_space = None
-    dataset_name: str
+    pretrained: str
+    # dataset_name: str
 
 
 @trainer.configclass
@@ -33,7 +34,7 @@ class ModelConfig(ModelConfigBase):
 @trainer.configclass
 class TrainConfig(TrainConfigBase):
     # data
-    dataset: Literal["hopper", "pong"] = "hopper"
+    dataset: Literal["hopper", "walker", "halfcheetah"] = "hopper"
     env_seed: int = -1
     dataset_root_path: str = "./data"
     device: str = "cuda:0"

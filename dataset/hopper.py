@@ -9,7 +9,6 @@ class Hopper(RLDataset):
     def __init__(self, config):
         super().__init__(config)
         self.env = gym.make('Hopper-v4')
-        self.pretrained = "edbeeching/decision-transformer-gym-hopper-medium"
         self.max_steps = 1000
 
     @property
@@ -32,7 +31,7 @@ class Hopper(RLDataset):
             name="linear",
             input_dim=(11,),
             output_dim=3,
-            dataset_name="hopper",
+            pretrained="edbeeching/decision-transformer-gym-hopper-medium",
         )
         cfg.action_space = self.env.action_space
         return cfg

@@ -1,5 +1,5 @@
 experiment_dir: "/home/ji/experiments"
-model_dir: "/home/ji/experiments/hopper_spd_tune"
+model_dir: "/home/ji/experiments/hopper_pd_tune"
 logger_configs:
   - name: tensorboard
 train_config:
@@ -9,7 +9,7 @@ train_config:
   # train
   max_episodes: 100
   val_episodes: 100
-  train_iter: 1
+  train_iter: 50
   batch_size: 64
   device: cuda
   amp: true
@@ -22,20 +22,16 @@ train_config:
       lr: 2e-4
 #      betas: [0.9, 0.999]
 model_config:
-  name: spd
+  name: pd
   buffer_size: 500
   replay_size: 32
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
-  # spd hparams
-  recent_replay_ratio: 0.5
-  sup_decay: 0.8
-  threshold: 10.0
 
 tune:
-  model_config.recent_replay_ratio: [ 0, 1.0 ]
-  model_config.sup_decay: [ 0, 1.0 ]
-  model_config.threshold: [ 5, 20 ]
+  # train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+  model_config.teacher_smooth_factor: [ 0.1, 10.0 ]
+  model_config.teacher_std: [ 0.000001, 0.1 ]
 total_trials: 100
 concurrent_trials: 20
 experiment_type: tpe

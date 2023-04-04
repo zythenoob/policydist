@@ -6,7 +6,9 @@ from pathlib import Path
 from trainer import SummaryLogger
 
 import models
+from dataset.halfcheetah import HalfCheetah
 from dataset.hopper import Hopper
+from dataset.walker import Walker
 from modules.evaluation import PDMetrics
 
 
@@ -37,6 +39,10 @@ for model in get_all_models():
 def get_dataset(config):
     if config.dataset == "hopper":
         return Hopper(config)
+    elif config.dataset == "walker":
+        return Walker(config)
+    elif config.dataset == "halfcheetah":
+        return HalfCheetah(config)
     else:
         raise NotImplementedError
 

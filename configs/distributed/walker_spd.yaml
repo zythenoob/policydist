@@ -1,9 +1,9 @@
 experiment_dir: "/home/ji/experiments"
-model_dir: "/home/ji/experiments/hopper_spd_tune"
+model_dir: "/home/ji/experiments/walker_spd"
 logger_configs:
   - name: tensorboard
 train_config:
-  dataset: hopper
+  dataset: walker
   dataset_root_path: /tmp/data
   epochs: 1
   # train
@@ -23,8 +23,8 @@ train_config:
 #      betas: [0.9, 0.999]
 model_config:
   name: spd
-  buffer_size: 500
-  replay_size: 32
+  buffer_size: 1000
+  replay_size: 64
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
   # spd hparams
@@ -33,12 +33,10 @@ model_config:
   threshold: 10.0
 
 tune:
-  model_config.recent_replay_ratio: [ 0, 1.0 ]
-  model_config.sup_decay: [ 0, 1.0 ]
-  model_config.threshold: [ 5, 20 ]
-total_trials: 100
+  train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+total_trials: 20
 concurrent_trials: 20
-experiment_type: tpe
+experiment_type: random
 optim_directions: [[val_reward, max]]
 ignore_errored_trials: True
 num_experiment_per_gpu: 10

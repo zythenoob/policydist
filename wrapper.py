@@ -95,6 +95,8 @@ class PDWrapper(ModelWrapper):
         max_episodes = self.train_config.max_episodes
         val_episodes = self.train_config.val_episodes
 
+        print('Num student parameters:', sum(p.numel() for p in self.model.student.parameters() if p.requires_grad))
+
         for ep in range(max_episodes):
             # train
             model.set_train()

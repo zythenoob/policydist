@@ -53,7 +53,7 @@ class DTModel(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.memory = None
-        self.model = get_pretrained_DTModel(config.backbone_config.dataset_name)
+        self.model = DecisionTransformerModel.from_pretrained(config.backbone_config.pretrained)
         self.model.eval()
 
         print('Num teacher parameters:', sum(p.numel() for p in self.model.parameters() if p.requires_grad))
@@ -173,10 +173,3 @@ class DTModel(BaseModel):
         )
 
         return action_preds[0, -1]
-
-
-def get_pretrained_DTModel(name):
-    if name == "hopper":
-        return DecisionTransformerModel.from_pretrained("edbeeching/decision-transformer-gym-hopper-medium")
-    else:
-        raise NotImplementedError
