@@ -9,7 +9,7 @@ train_config:
   # train
   max_episodes: 100
   val_episodes: 100
-  train_iter: 1
+  train_iter: 4
   batch_size: 64
   device: cuda
   amp: true
@@ -23,20 +23,21 @@ train_config:
 #      betas: [0.9, 0.999]
 model_config:
   name: spd
-  buffer_size: 1000
-  replay_size: 64
+  buffer_size: 2000
+  replay_size: 128
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
   # spd hparams
-  recent_replay_ratio: 0.5
-  sup_decay: 0.8
-  threshold: 10.0
+  recent_replay_ratio: 0.40566
+  sup_decay: 0.965039
+  threshold: 9.73488
+  direction_threshold: 0.264764
 
 tune:
   train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
 total_trials: 20
-concurrent_trials: 20
+concurrent_trials: 16
 experiment_type: random
 optim_directions: [[val_reward, max]]
 ignore_errored_trials: True
-num_experiment_per_gpu: 10
+num_experiment_per_gpu: 8

@@ -145,7 +145,6 @@ class PDWrapper(ModelWrapper):
         if tag == "train":
             if not isinstance(model, SPD):
                 self.train_student(model)
-            print('total updates:', model.updates)
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter

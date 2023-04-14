@@ -29,6 +29,9 @@ class SPD(BaseModel):
         self.recent_replay_ratio = config.recent_replay_ratio
         self.sup_decay = config.sup_decay
         self.threshold = config.threshold
+        self.direction_threshold = config.direction_threshold
+
+        # self.sup_magnitudes = []
 
     @torch.no_grad()
     def observe(self, state, tag):
@@ -60,6 +63,44 @@ class SPD(BaseModel):
         self.teacher.add_sequence_stats(kwargs['rewards'])
         # check surprise
         self.student.zero_grad()
+        surprise_score = self.check_surprise(states, actions)
+        grads = self.student.get_grads()
+        self.student.zero_grad()
+
+        if surprise_score > self.threshold:
+            # check surprise direction
+            sim = 1.0
+            if self.memory.is_full():
+                buf_samples = self.memory.get_all_data()
+                buf_length = len(self.memory)
+                minibatch = 100
+                minibatch_sim = []
+                for idx in range(0, buf_length, minibatch):
+                    buf_states, buf_actions = buf_samples['states'][idx: idx + minibatch].to(self.device), buf_samples['actions'][idx: idx + minibatch].to(self.device)
+                    _, loss = self.forward(buf_states, buf_actions)
+                    loss.backward()
+                    buf_grads = self.student.get_grads()
+                    minibatch_sim.append((F.cosine_similarity(grads, buf_grads, dim=0) + 1).cpu().item() * len(buf_states))
+                    self.student.zero_grad()
+                sim = np.sum(minibatch_sim) / buf_length
+
+            if sim > self.direction_threshold:
+                self.surprise_state = True
+                self.memory.add_data(states=states, actions=actions, **kwargs)
+
+                # self.sup_magnitudes.append(surprise_score.cpu().item())
+        
+        # if self.updates > 0 and self.updates % 1000 == 0:
+        #     print(f"recent surprise magnitudes: {np.mean(self.sup_magnitudes[-1000:])}")
+
+    def replay(self, size=None):
+        if size is None:
+            size = self.replay_size
+        recent_samples = int(size * self.recent_replay_ratio)
+        return self.memory.get_data(size, recent=recent_samples)
+    
+    def check_surprise(self, states, actions):
+        # check surprise
         _, loss = self.forward(states, actions)
         loss.backward()
         grads = self.student.get_grads_list()
@@ -75,12 +116,4 @@ class SPD(BaseModel):
         self.surprise_stats["std"] = (1 - self.sup_decay) * (
                 self.surprise_stats["std"] + self.sup_decay * delta ** 2
         )
-        self.student.zero_grad()
-
-        if surprise_score > self.threshold:
-            self.surprise_state = True
-            self.memory.add_data(states=states, actions=actions, **kwargs)
-
-    def replay(self):
-        recent_samples = int(self.replay_size * self.recent_replay_ratio)
-        return self.memory.get_data(self.replay_size, recent=recent_samples)
+        return surprise_score

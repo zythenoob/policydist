@@ -81,6 +81,9 @@ class Buffer:
         if return_index:
             ret_tuple['index'] = torch.tensor(choice).to(self.device)
         return ret_tuple
+    
+    def get_all_data(self):
+        return self.get_data(size=len(self))
 
     def is_empty(self) -> bool:
         """
@@ -195,7 +198,7 @@ class FIFOBuffer(Buffer):
         """
         recent_size = 0
         if recent is not None:
-            assert recent > 0
+            assert recent >= 0
             recent_size = min(self.num_seen_examples, self.buffer_size, recent)
 
         if size > min(self.num_seen_examples, self.buffer_size):

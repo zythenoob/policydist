@@ -9,6 +9,9 @@ from configs import ModelConfig, TrainConfig
 from utils import model_names
 from wrapper import PDWrapper
 
+# import os
+# os.environ["RAY_ADDRESS"] = "127.0.0.1:4884"
+
 
 @configclass
 class ParallelConfig(MPConfig):

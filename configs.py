@@ -29,6 +29,7 @@ class ModelConfig(ModelConfigBase):
     recent_replay_ratio: float = 0.5
     sup_decay: float = 0.8
     threshold: float = 10.0
+    direction_threshold: float = -1.0
 
 
 @trainer.configclass
