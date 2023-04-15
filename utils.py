@@ -3,7 +3,7 @@ import os
 import importlib
 from pathlib import Path
 
-from trainer import SummaryLogger
+from ablator.modules.loggers.main import SummaryLogger
 
 import models
 from dataset.halfcheetah import HalfCheetah
@@ -47,9 +47,9 @@ def get_dataset(config):
         raise NotImplementedError
 
 def tensorboard_log_step(
-    writer: SummaryLogger, metrics: PDMetrics, model: models.BaseModel, iteration: int
+    writer: SummaryLogger, metrics: PDMetrics, iteration: int
 ):
     writer._add_metric(
-        "updates", model.updates, iteration,
+        "updates", metrics.num_updates, iteration,
     )
 

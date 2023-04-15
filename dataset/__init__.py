@@ -36,3 +36,6 @@ class RLDataset:
 
     def get_dataloader(self):
         return self
+
+    def __len__(self):
+        return 1

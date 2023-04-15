@@ -1,13 +1,14 @@
 import logging
+from functools import cached_property
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
-import trainer
+import ablator
 from tqdm import tqdm
-from trainer import ModelWrapper
-from trainer.config.run import RunConfigBase
+from ablator import ModelWrapper
+from ablator.main.configs import RunConfig
 
-from configs import ModelConfig, TrainConfig
+from configs import PDModelConfig, PDTrainConfig
 from dataset import RLDataset
 from models import BaseModel
 from models.spd import SPD
@@ -19,10 +20,10 @@ np.seterr(all="raise")
 logger = logging.getLogger(__name__)
 
 
-@trainer.configclass
-class RunConfig(RunConfigBase):
-    model_config: ModelConfig
-    train_config: TrainConfig
+@ablator.configclass
+class PDRunConfig(RunConfig):
+    model_config: PDModelConfig
+    train_config: PDTrainConfig
 
 
 def collate_fn(p):
@@ -36,15 +37,12 @@ class PDWrapper(ModelWrapper):
             *args,
             **kwargs,
         )
-        self.train_config: TrainConfig
-        self.model_config: ModelConfig
+        self.train_config: PDTrainConfig
+        self.model_config: PDModelConfig
         self.model: BaseModel
 
         self.train_dataloader: RLDataset
         self.test_dataloader: None
-
-    def _total_steps(self):
-        return self.train_config.max_episodes
 
     def config_parser(self, config: RunConfig):
         config = super().config_parser(config)
@@ -53,8 +51,11 @@ class PDWrapper(ModelWrapper):
         )
         return config
 
-    @property
+    @cached_property
     def epoch_len(self):
+        assert (
+                hasattr(self, "train_dataloader") and len(self.train_dataloader) > 0
+        ), "Undefined train_dataloader."
         return self.train_config.max_episodes
 
     @property
@@ -64,30 +65,30 @@ class PDWrapper(ModelWrapper):
     def evaluation_functions(self) -> Optional[Dict[str, Callable]]:
         return None
 
-    def train_loop(self):
+    def train_loop(self, smoke_test=False):
         self.metrics = PDMetrics(
-            epochs=self.train_config.max_episodes,
-            total_steps=self._total_steps(),
-            moving_average_limit=self.epoch_len,
-            lr=self.run_config.train_config.optimizer_config.lr,
-            evaluation_functions=self.evaluation_functions(),
+            tags=["train", "val"],
             batch_limit=float("inf"),
             val_episodes=self.run_config.train_config.val_episodes,
+            static_aux_metrics=self.train_stats,
+            moving_aux_metrics=["loss"] + getattr(self, "aux_metric_names", []),
         )
 
-        self.train_tqdm = tqdm(
-            total=self.epoch_len,
-            bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}",
-            position=0,
-            leave=True,
-            dynamic_ncols=True,
-        )
+        # self.train_tqdm = tqdm(
+        #     total=self.epoch_len,
+        #     bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}",
+        #     position=0,
+        #     leave=True,
+        #     dynamic_ncols=True,
+        # )
 
         self.train_online()
         return self.metrics
 
-    def log_step(self):
-        super().log_step()
+    def log(self):
+        # Log step
+        self.metrics.evaluate("train", reset=False)
+        self.log_step()
 
     def train_online(self):
         # train model
@@ -105,19 +106,16 @@ class PDWrapper(ModelWrapper):
             # eval
             if ep % 1 == 0:
                 model.set_eval()
-                self.metrics.get_preds("val").reset()
                 for val_ep in range(val_episodes):
                     self.run_episode(tag="val", episode_id=val_ep)
 
-                self.metrics.eval_metrics('val')
-                msg = self.metrics.get_msg()
-                self.logger.info(f"Step [{ep}] {msg}", to_console=True)
+                self.metrics.evaluate("val", reset=True)
+                msg = self.status_message()
+                self.logger.info(f"Evaluation Episode [{ep}] {msg}", verbose=False)
 
-            self.metrics.eval_metrics('train')
-            self.metrics.num_updates = model.updates
-            self.update_tqdm()
-            self.log_step()
-            tensorboard_log_step(self.logger, self.metrics, model, self.iteration)
+            self.update_status()
+            self.log()
+            # tensorboard_log_step(self.logger, self.metrics, self.current_iteration)
 
     def run_episode(self, tag, episode_id):
         model = self.model
@@ -135,8 +133,13 @@ class PDWrapper(ModelWrapper):
                     self.train_student(model)
                     model.surprise_state = False
 
-            aux_metrics = dict(rewards=reward[0], traj_names=str(episode_id))
-            self.metrics.append(aux_metrics=aux_metrics, tag=tag)
+            print(tag, reward)
+
+            aux_metrics = {
+                f'step_reward': reward,
+                f'step_episode': np.array([episode_id]),
+            }
+            self.metrics.update_custom_metrics(aux_metrics, tag=tag)
             state = next_state.clone()
             if terminate:
                 break
@@ -145,13 +148,14 @@ class PDWrapper(ModelWrapper):
         if tag == "train":
             if not isinstance(model, SPD):
                 self.train_student(model)
+        self.metrics.update_custom_metrics({'n_updates': np.array([model.updates])}, tag="train")
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter
         for _ in range(train_iter):
             batch = model.replay()
-            _, _, loss, _ = self.train_step(batch)
-            self.metrics.append(loss=loss, tag="train")
+            _, train_metrics = self.train_step(batch)
+            self.metrics.update_ma_metrics(train_metrics, tag="train")
             model.updates += 1
 
     def make_dataloader_val(self, run_config: RunConfig):

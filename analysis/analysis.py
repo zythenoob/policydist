@@ -4,11 +4,21 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from PIL import Image
+from ablator import Results
 
-from trainer.analysis.plot import CustomReport
-from trainer.analysis.utils import fig2img
+from distributed import PDParallelConfig
 
-from distributed import ParallelConfig
+
+def fig2img(fig):
+    """Convert a Matplotlib figure to a PIL Image and return it"""
+    import io
+
+    buf = io.BytesIO()
+    fig.savefig(buf)
+    buf.seek(0)
+    img = Image.open(buf)
+    return img
 
 
 def plot_lines(path, ep, t_r, updates, rewards):
@@ -55,7 +65,7 @@ if __name__ == "__main__":
     # pd_experiment_dir = Path("/home/ji/experiments/hopper_pd/mp_run_dcb9_a891")
     experiment_dir = Path("/home/ji/experiments/walker")
     # experiment_dir = Path("/home/ji/experiments/mp_run_d9a2_4a5b")
-    run_configs = list(experiment_dir.rglob("run_config.yaml"))
+    experiment_paths = list(experiment_dir.rglob("run_config.yaml"))
     results_dir = Path("/home/ji/experiments/").joinpath("analysis")
 
     # fig, ax = plt.subplots()
@@ -64,26 +74,21 @@ if __name__ == "__main__":
     rewards = {}
     teacher_reward = []
 
-    for run_config in run_configs:
-        if 'mp_run_6d4f_8a13' in run_config.as_posix():
-            continue
-        config = ParallelConfig.load(run_config)
-        method_name = config.model_config.name
+    for path in experiment_paths:
+        path = path.parent
         try:
-            results = CustomReport(
-                config=config,
-                parse_informative=False,
-            )
 
-            results = CustomReport(
-                config=config,
-                parse_informative=False,
-            ).results
+            results = Results(
+                config=PDParallelConfig,
+                experiment_dir=path,
+            )
+            method_name = results.config.model_config.name
+            data = results.data
 
             updates[method_name] = [[] for _ in range(100)]
             rewards[method_name] = [[] for _ in range(100)]
 
-            for i, row in results.iterrows():
+            for i, row in data.iterrows():
                 train_ep = int(row['train_aux_traj_names'])
                 updates[method_name][train_ep].append(float(row['num_updates']))
                 rewards[method_name][train_ep].append(float(row['val_reward']))

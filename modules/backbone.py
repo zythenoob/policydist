@@ -77,7 +77,7 @@ class QNetwork(Backbone):
     def __init__(self, config):
         super().__init__()
         self.feature_extractor = None
-        qnet_input_size = config.input_dim[0] + config.output_dim
+        qnet_input_size = config.input_dim + config.output_dim
         self.Q1 = get_backbone("linear", qnet_input_size, 1)
         self.Q2 = get_backbone("linear", qnet_input_size, 1)
 
@@ -91,7 +91,7 @@ class QNetwork(Backbone):
 class ValueNetwork(Backbone):
     def __init__(self, config):
         super(ValueNetwork, self).__init__()
-        input_dim = config.input_dim[0]
+        input_dim = config.input_dim
         self.net = get_backbone("linear", input_dim, 1)
 
     def forward(self, state):
@@ -101,7 +101,7 @@ class ValueNetwork(Backbone):
 class SoftQNetwork(Backbone):
     def __init__(self, config):
         super(SoftQNetwork, self).__init__()
-        input_dim = config.input_dim[0] + config.output_dim
+        input_dim = config.input_dim + config.output_dim
         self.net = get_backbone("linear", input_dim, 1)
 
     def forward(self, state, action):
@@ -116,7 +116,7 @@ class PolicyNetwork(Backbone):
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
         hidden_size = 100
-        input_dim = config.input_dim[0]
+        input_dim = config.input_dim
         output_dim = config.output_dim
 
         self.net = get_backbone("linear", input_dim, hidden_size)

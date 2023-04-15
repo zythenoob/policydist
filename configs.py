@@ -1,21 +1,20 @@
-from typing import List, Optional, Tuple, Literal
-import trainer
-from gymnasium import Space
-from trainer.config.run import ModelConfigBase, TrainConfigBase
+from typing import List, Optional, Tuple, Literal, Any
+import ablator
+from ablator import ModelConfig, TrainConfig, Annotation, Derived
 
 
-@trainer.configclass
-class BackboneConfig(ModelConfigBase):
+@ablator.configclass
+class BackboneConfig(ModelConfig):
     name: str
-    input_dim: List[int]
+    input_dim: int
     output_dim: int
-    action_space = None
+    # action_space: None = None
     pretrained: str
     # dataset_name: str
 
 
-@trainer.configclass
-class ModelConfig(ModelConfigBase):
+@ablator.configclass
+class PDModelConfig(ModelConfig):
     name: str
     buffer_size: int = 1e+5
     replay_size: int = 200
@@ -23,7 +22,7 @@ class ModelConfig(ModelConfigBase):
     teacher_std: float = 0.01
 
     # backbone
-    backbone_config: trainer.Annotated[Optional[BackboneConfig], trainer.Derived] = None
+    backbone_config: Derived[BackboneConfig] = None
 
     # SPD hparams
     recent_replay_ratio: float = 0.5
@@ -32,8 +31,8 @@ class ModelConfig(ModelConfigBase):
     direction_threshold: float = -1.0
 
 
-@trainer.configclass
-class TrainConfig(TrainConfigBase):
+@ablator.configclass
+class PDTrainConfig(TrainConfig):
     # data
     dataset: Literal["hopper", "walker", "halfcheetah"] = "hopper"
     env_seed: int = -1

@@ -1,26 +1,25 @@
 experiment_dir: "/tmp/experiments"
-model_dir: "/tmp/experiments/test"
-logger_configs:
-  - name: tensorboard
+verbose: tqdm
+amp: true
+device: cuda:0
+tensorboard: true
+
 train_config:
-  dataset: walker
+  dataset: hopper
   dataset_root_path: /tmp/data
   epochs: 1
   # train
   max_episodes: 100
-  val_episodes: 100
+  val_episodes: 1
   train_iter: 1500
   batch_size: 64
-  device: cuda:0
-  amp: true
-  debug: true
-  resume: false
   # optimizer
   optimizer_config:
     name: adam
     arguments:
       lr: 2e-4
 #      betas: [0.9, 0.999]
+
 model_config:
   name: pd
   buffer_size: 2000

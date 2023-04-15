@@ -1,8 +1,7 @@
 import argparse
 from pathlib import Path
 from omegaconf import OmegaConf
-from trainer import BaseTrainer, configclass, MPConfig
-from trainer.mp import MPTrainer
+from ablator import ParallelTrainer, ParallelConfig, configclass, Results
 import ray
 
 from configs import ModelConfig, TrainConfig
@@ -14,7 +13,7 @@ from wrapper import PDWrapper
 
 
 @configclass
-class ParallelConfig(MPConfig):
+class PDParallelConfig(ParallelConfig):
     model_config: ModelConfig
     train_config: TrainConfig
 
@@ -27,21 +26,15 @@ def my_train(config):
     )
 
     run_config = ParallelConfig(**kwargs)  # type: ignore
-    run_config.train_config.tqdm = False
-    ray.init(
-        address="auto", runtime_env={"working_dir": Path(__file__).parent.resolve()}
-    )
-    trainer = MPTrainer(
-        model=model,
+    run_config.verbose = "silent"
+    trainer = ParallelTrainer(
+        wrapper=model,
         run_config=run_config,
-        description="Parallel training experiments",
     )
-    trainer.launch()
+    trainer.gpu = 1 / config.concurrent_trials
+    trainer.launch(kwargs['experiment_dir'], ray_head_address=None)
 
-    from trainer.analysis.plot import CustomReport
-
-    report = CustomReport(run_config)
-    report.make()
+    res = Results(PDParallelConfig, trainer.experiment_dir)
 
 
 if __name__ == "__main__":

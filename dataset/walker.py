@@ -32,7 +32,7 @@ class Walker(RLDataset):
     def backbone_config(self):
         cfg = BackboneConfig(
             name="linear",
-            input_dim=(17,),
+            input_dim=17,
             output_dim=6,
             pretrained="edbeeching/decision-transformer-gym-walker2d-expert",
         )

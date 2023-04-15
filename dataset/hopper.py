@@ -29,9 +29,10 @@ class Hopper(RLDataset):
     def backbone_config(self):
         cfg = BackboneConfig(
             name="linear",
-            input_dim=(11,),
+            input_dim=11,
             output_dim=3,
             pretrained="edbeeching/decision-transformer-gym-hopper-medium",
+            # action_space=self.env.action_space
         )
-        cfg.action_space = self.env.action_space
+        # cfg.action_space = self.env.action_space
         return cfg

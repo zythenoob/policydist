@@ -1,24 +1,23 @@
 import argparse
 from pathlib import Path
 from omegaconf import OmegaConf
-from trainer import BaseTrainer
+from ablator import ProtoTrainer
 
 from utils import model_names
-from wrapper import RunConfig, PDWrapper
+from wrapper import PDWrapper, PDRunConfig
 
 
 def my_train(config):
     yaml_kwargs = OmegaConf.load(Path(config).as_posix())
     kwargs = OmegaConf.to_object(yaml_kwargs)
-    run_config = RunConfig(**kwargs)
+    run_config = PDRunConfig(**kwargs)
     model = PDWrapper(
         model_class=model_names[run_config.model_config.name]
     )
 
-    trainer = BaseTrainer(
-        model=model,
+    trainer = ProtoTrainer(
+        wrapper=model,
         run_config=run_config,
-        description="Experiments",
     )
 
     trainer.launch()
