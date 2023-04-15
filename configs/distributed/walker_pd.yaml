@@ -1,5 +1,4 @@
-experiment_dir: "/home/ji/experiments"
-model_dir: "/home/ji/experiments/walker_pd"
+experiment_dir: "/home/ji/experiments/walker"
 logger_configs:
   - name: tensorboard
 train_config:
@@ -9,7 +8,7 @@ train_config:
   # train
   max_episodes: 100
   val_episodes: 100
-  train_iter: 2000
+  train_iter: 1000
   batch_size: 64
   device: cuda
   amp: true
@@ -20,11 +19,11 @@ train_config:
     name: adam
     arguments:
       lr: 2e-4
-#      betas: [0.9, 0.999]
+      betas: [0.5, 0.999]
 model_config:
   name: pd
-  buffer_size: 2000
-  replay_size: 128
+  buffer_size: 1000
+  replay_size: 64
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
 

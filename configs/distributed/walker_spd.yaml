@@ -1,5 +1,4 @@
-experiment_dir: "/home/ji/experiments"
-model_dir: "/home/ji/experiments/walker_spd"
+experiment_dir: "/home/ji/experiments/walker"
 logger_configs:
   - name: tensorboard
 train_config:
@@ -20,24 +19,24 @@ train_config:
     name: adam
     arguments:
       lr: 2e-4
-#      betas: [0.9, 0.999]
+      betas: [0.5, 0.999]
 model_config:
   name: spd
-  buffer_size: 2000
-  replay_size: 128
+  buffer_size: 1000
+  replay_size: 64
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
   # spd hparams
-  recent_replay_ratio: 0.40566
-  sup_decay: 0.965039
-  threshold: 9.73488
-  direction_threshold: 0.264764
+  recent_replay_ratio: 0.511934
+  sup_decay: 0.992526
+  threshold: 19.3735
+  direction_threshold: 0.453641
 
 tune:
   train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
 total_trials: 20
-concurrent_trials: 16
+concurrent_trials: 10
 experiment_type: random
 optim_directions: [[val_reward, max]]
 ignore_errored_trials: True
-num_experiment_per_gpu: 8
+num_experiment_per_gpu: 5
