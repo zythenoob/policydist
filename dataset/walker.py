@@ -36,5 +36,4 @@ class Walker(RLDataset):
             output_dim=6,
             pretrained="edbeeching/decision-transformer-gym-walker2d-expert",
         )
-        cfg.action_space = self.env.action_space
         return cfg
