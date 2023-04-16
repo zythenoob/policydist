@@ -11,6 +11,7 @@ def my_train(config):
     yaml_kwargs = OmegaConf.load(Path(config).as_posix())
     kwargs = OmegaConf.to_object(yaml_kwargs)
     run_config = PDRunConfig(**kwargs)
+
     model = PDWrapper(
         model_class=model_names[run_config.model_config.name]
     )

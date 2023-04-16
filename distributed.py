@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
+
+from ablator.main.configs import SearchSpace
 from omegaconf import OmegaConf
 from ablator import ParallelTrainer, ParallelConfig, configclass, Results
 import ray
 
-from configs import ModelConfig, TrainConfig
+from configs import PDModelConfig, PDTrainConfig
 from utils import model_names
 from wrapper import PDWrapper
 
@@ -14,8 +16,8 @@ from wrapper import PDWrapper
 
 @configclass
 class PDParallelConfig(ParallelConfig):
-    model_config: ModelConfig
-    train_config: TrainConfig
+    model_config: PDModelConfig
+    train_config: PDTrainConfig
 
 
 def my_train(config):
@@ -25,13 +27,12 @@ def my_train(config):
         model_class=model_names[kwargs["model_config"]["name"]]
     )
 
-    run_config = ParallelConfig(**kwargs)  # type: ignore
-    run_config.verbose = "silent"
+    run_config = PDParallelConfig(**kwargs)
     trainer = ParallelTrainer(
         wrapper=model,
         run_config=run_config,
     )
-    trainer.gpu = 1 / config.concurrent_trials
+    trainer.gpu = 1 / run_config.concurrent_trials
     trainer.launch(kwargs['experiment_dir'], ray_head_address=None)
 
     res = Results(PDParallelConfig, trainer.experiment_dir)

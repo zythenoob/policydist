@@ -1,34 +1,33 @@
 experiment_dir: "/tmp/experiments"
-model_dir: "/tmp/experiments/test_spd"
-logger_configs:
-  - name: tensorboard
+verbose: tqdm
+amp: true
+device: cuda:0
+tensorboard: true
+
 train_config:
   dataset: walker
   dataset_root_path: /tmp/data
   epochs: 1
   # train
   max_episodes: 100
-  val_episodes: 100
-  train_iter: 4
+  val_episodes: 10
+  train_iter: 3
   batch_size: 64
-  device: cuda:1
-  amp: true
-  debug: true
-  resume: false
   # optimizer
   optimizer_config:
     name: adam
     arguments:
       lr: 2e-4
-#      betas: [0.9, 0.999]
+      betas: [0.5, 0.999]
+
 model_config:
   name: spd
-  buffer_size: 2000
-  replay_size: 128
+  buffer_size: 1000
+  replay_size: 380
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
   # spd hparams
-  recent_replay_ratio: 0.40566
-  sup_decay: 0.965039
-  threshold: 9.73488
-  direction_threshold: 0.264764
+  recent_replay_ratio: 0.568297
+  sup_decay: 0.893494
+  threshold: 6.78839
+  direction_threshold: 0.353084

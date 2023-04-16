@@ -14,17 +14,14 @@ class PDMetrics(TrainMetrics):
     def __init__(self, val_episodes, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.val_episodes = val_episodes
-        self.custom_attrs = ["step_reward", "step_episode", "n_updates"]
+        self.custom_attrs = ["step_reward", "step_episode"]
         self.custom_metrics = {}
         self._init_custom_metrics()
 
     def to_dict(self):
-        attrs = self.__moving_aux_attributes__
-        print(attrs)
-        print(self.custom_metrics)
+        attrs = ['train_loss']
         ma_attrs = {k: self._get_ma(k).value for k in attrs}
         static_attrs = {k: getattr(self, k) for k in self.__static_aux_attributes__}
-        assert 0
         return {**ma_attrs, **static_attrs, **self.custom_metrics}
 
     def update_custom_metrics(self, metric_dict: dict[str, Any], tag: str):
@@ -51,32 +48,23 @@ class PDMetrics(TrainMetrics):
             for attr in self.custom_attrs:
                 _arr = getattr(self, f"val_{attr}", None)
                 _arr.reset()
-        else:
-            preds = self._get_preds(tag)
-            metrics = preds.evaluate()
-            if update_ma:
-                self._update_ma_metrics(metrics, tag)
-            if reset:
-                preds.reset()
-            return metrics
 
     def eval_rewards(self):
         train_reward = self.get_avg_reward("train")
         val_reward = self.get_avg_reward("val")
-        n_updates = getattr(self, f"train_n_updates").get()[0][-1]
 
         return {
             f'train_reward': train_reward,
             f'val_reward': val_reward,
-            f'n_updates': n_updates,
         }
 
     def get_avg_reward(self, tag):
         cutoff = 10 if tag == "train" else self.val_episodes
         rewards = getattr(self, f"{tag}_step_reward").get()[0]
         episodes = getattr(self, f"{tag}_step_episode").get()[0]
-        traj_switch_idx = np.nonzero(episodes[1:] != episodes[:-1])[0][-cutoff:]
+        ep_ids = np.unique(episodes)[-cutoff:]
         avg_reward = 0
-        if len(traj_switch_idx) > 0:
-            avg_reward = np.sum(rewards[traj_switch_idx[0]:]) / len(traj_switch_idx)
+        for ep in ep_ids:
+            avg_reward += np.sum(rewards[episodes == ep])
+        avg_reward /= len(ep_ids)
         return avg_reward

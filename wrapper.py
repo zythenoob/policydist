@@ -26,10 +26,6 @@ class PDRunConfig(RunConfig):
     train_config: PDTrainConfig
 
 
-def collate_fn(p):
-    return p
-
-
 class PDWrapper(ModelWrapper):
     def __init__(self, *args, **kwargs):
 
@@ -40,6 +36,7 @@ class PDWrapper(ModelWrapper):
         self.train_config: PDTrainConfig
         self.model_config: PDModelConfig
         self.model: BaseModel
+        self.current_episode = 0
 
         self.train_dataloader: RLDataset
         self.test_dataloader: None
@@ -62,8 +59,23 @@ class PDWrapper(ModelWrapper):
     def log_itr(self):
         return 1
 
+    @property
+    def current_epoch(self) -> int:
+        return self.current_episode
+
     def evaluation_functions(self) -> Optional[Dict[str, Callable]]:
         return None
+
+    def status_message(self) -> str:
+        # must return current epoch, iter, losses and metrics
+        msg = []
+        for k, v in self.metrics.to_dict().items():
+            if k in ['best_iteration', 'best_loss', 'current_epoch']:
+                continue
+            if 'loss' in k or 'reward' in k:
+                msg.append(f"{k}: {v:.3f}")
+        return f"Training episode [{self.current_episode}/{self.train_config.max_episodes}]: " \
+               + " / ".join(msg)
 
     def train_loop(self, smoke_test=False):
         self.metrics = PDMetrics(
@@ -99,23 +111,21 @@ class PDWrapper(ModelWrapper):
         print('Num student parameters:', sum(p.numel() for p in self.model.student.parameters() if p.requires_grad))
 
         for ep in range(max_episodes):
+            self.current_episode = ep
             # train
             model.set_train()
             self.run_episode(tag="train", episode_id=ep)
-
             # eval
             if ep % 1 == 0:
                 model.set_eval()
                 for val_ep in range(val_episodes):
                     self.run_episode(tag="val", episode_id=val_ep)
-
                 self.metrics.evaluate("val", reset=True)
                 msg = self.status_message()
                 self.logger.info(f"Evaluation Episode [{ep}] {msg}", verbose=False)
 
             self.update_status()
             self.log()
-            # tensorboard_log_step(self.logger, self.metrics, self.current_iteration)
 
     def run_episode(self, tag, episode_id):
         model = self.model
@@ -133,8 +143,6 @@ class PDWrapper(ModelWrapper):
                     self.train_student(model)
                     model.surprise_state = False
 
-            print(tag, reward)
-
             aux_metrics = {
                 f'step_reward': reward,
                 f'step_episode': np.array([episode_id]),
@@ -148,7 +156,6 @@ class PDWrapper(ModelWrapper):
         if tag == "train":
             if not isinstance(model, SPD):
                 self.train_student(model)
-        self.metrics.update_custom_metrics({'n_updates': np.array([model.updates])}, tag="train")
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter

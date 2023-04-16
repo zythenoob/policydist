@@ -38,6 +38,7 @@ class PDTrainConfig(TrainConfig):
     env_seed: int = -1
     dataset_root_path: str = "./data"
     device: str = "cuda:0"
+    rand_weights_init: bool = False
     # train
     max_episodes: int = 1000
     val_episodes: int = 100
