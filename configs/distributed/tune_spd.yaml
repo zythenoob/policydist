@@ -1,6 +1,6 @@
-experiment_dir: "/home/ji/experiments/tune_spd"
-verbose: tqdm
-amp: false
+experiment_dir: "/home/ji/experiments/tune_walker_spd"
+verbose: silent
+amp: true
 device: cuda
 tensorboard: true
 
@@ -10,19 +10,19 @@ train_config:
   epochs: 1
   # train
   max_episodes: 100
-  val_episodes: 100
+  val_episodes: 20
   train_iter: 3
   batch_size: 64
   # optimizer
   optimizer_config:
     name: adam
     arguments:
-      lr: 2e-4
+      lr: 1e-4
       betas: [0.5, 0.999]
 
 model_config:
   name: spd
-  buffer_size: 1000
+  buffer_size: 200
   replay_size: 64
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
@@ -33,8 +33,11 @@ model_config:
   direction_threshold: 0.264764
 
 search_space:
+  train_config.train_iter:
+    value_range: [1, 5]
+    value_type: int
   model_config.replay_size:
-    value_range: [16, 512]
+    value_range: [16, 200]
     value_type: int
   model_config.recent_replay_ratio:
     value_range: [0, 1.0]
@@ -52,7 +55,7 @@ total_trials: 100
 concurrent_trials: 10
 search_algo: tpe
 optim_metrics:
-  val_reward: max
+  avg_val_reward: max
 ignore_invalid_params: True
 gpu_mb_per_experiment: 1000
-cpus_per_experiment: 0.01
+cpus_per_experiment: 0.05

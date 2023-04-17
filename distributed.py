@@ -32,7 +32,7 @@ def my_train(config):
         wrapper=model,
         run_config=run_config,
     )
-    trainer.gpu = 1 / run_config.concurrent_trials
+    trainer.gpu = 2 / run_config.concurrent_trials
     trainer.launch(kwargs['experiment_dir'], ray_head_address=None)
 
     res = Results(PDParallelConfig, trainer.experiment_dir)

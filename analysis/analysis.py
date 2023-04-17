@@ -61,11 +61,8 @@ def plot_lines(path, ep, t_r, updates, rewards):
 
 
 if __name__ == "__main__":
-    # spd_experiment_dir = Path("/home/ji/experiments/hopper_spd/mp_run_3456_8ff5")
-    # pd_experiment_dir = Path("/home/ji/experiments/hopper_pd/mp_run_dcb9_a891")
     experiment_dir = Path("/home/ji/experiments/walker")
-    # experiment_dir = Path("/home/ji/experiments/mp_run_d9a2_4a5b")
-    experiment_paths = list(experiment_dir.rglob("run_config.yaml"))
+    experiment_paths = list(experiment_dir.rglob("default_config.yaml"))
     results_dir = Path("/home/ji/experiments/").joinpath("analysis")
 
     # fig, ax = plt.subplots()
@@ -89,8 +86,8 @@ if __name__ == "__main__":
             rewards[method_name] = [[] for _ in range(100)]
 
             for i, row in data.iterrows():
-                train_ep = int(row['train_aux_traj_names'])
-                updates[method_name][train_ep].append(float(row['num_updates']))
+                train_ep = int(row['current_epoch'])
+                updates[method_name][train_ep].append(float(row['current_iteration']))
                 rewards[method_name][train_ep].append(float(row['val_reward']))
                 teacher_reward.append(float(row['train_reward']))
 

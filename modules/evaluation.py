@@ -16,6 +16,7 @@ class PDMetrics(TrainMetrics):
         self.val_episodes = val_episodes
         self.custom_attrs = ["step_reward", "step_episode"]
         self.custom_metrics = {}
+        self.val_rewards = []
         self._init_custom_metrics()
 
     def to_dict(self):
@@ -52,10 +53,13 @@ class PDMetrics(TrainMetrics):
     def eval_rewards(self):
         train_reward = self.get_avg_reward("train")
         val_reward = self.get_avg_reward("val")
+        self.val_rewards.append(val_reward)
+        avg_val_reward = np.mean(np.array(self.val_rewards)[-5:])
 
         return {
             f'train_reward': train_reward,
             f'val_reward': val_reward,
+            f'avg_val_reward': avg_val_reward,
         }
 
     def get_avg_reward(self, tag):
