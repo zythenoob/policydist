@@ -1,6 +1,6 @@
 experiment_dir: "/tmp/experiments"
 verbose: tqdm
-amp: false
+amp: true
 device: cuda:0
 tensorboard: true
 
@@ -11,7 +11,7 @@ train_config:
   # train
   max_episodes: 100
   val_episodes: 10
-  train_iter: 1000
+  train_iter: 1
   batch_size: 64
   # optimizer
   optimizer_config:
@@ -22,7 +22,7 @@ train_config:
 
 model_config:
   name: pd
-  buffer_size: 1000
-  replay_size: 64
+  buffer_size: 200
+  replay_size: 20
   teacher_smooth_factor: 1.0
-  teacher_std: 1e-4
+#  teacher_std: 1e-4

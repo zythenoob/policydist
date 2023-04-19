@@ -1,42 +1,45 @@
 experiment_dir: "/home/ji/experiments/walker"
-logger_configs:
-  - name: tensorboard
+verbose: tqdm
+amp: true
+device: cuda
+tensorboard: true
+
 train_config:
   dataset: walker
   dataset_root_path: /tmp/data
   epochs: 1
   # train
-  max_episodes: 100
-  val_episodes: 100
+  max_episodes: 300
+  val_episodes: 10
   train_iter: 4
   batch_size: 64
-  device: cuda
-  amp: true
-  debug: false
-  resume: false
   # optimizer
   optimizer_config:
     name: adam
     arguments:
       lr: 2e-4
       betas: [0.5, 0.999]
+
 model_config:
   name: spd
-  buffer_size: 1000
-  replay_size: 64
+  buffer_size: 500
+  replay_size: 26
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
   # spd hparams
-  recent_replay_ratio: 0.511934
-  sup_decay: 0.992526
-  threshold: 19.3735
-  direction_threshold: 0.453641
+  recent_replay_ratio: 0.451391
+  sup_decay: 0.998812
+  threshold: 17.2583
+  direction_threshold: 0.945289
 
-tune:
-  train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
-total_trials: 20
+search_space:
+  train_config.env_seed:
+    categorical_values: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+total_trials: 10
 concurrent_trials: 10
-experiment_type: random
-optim_directions: [[val_reward, max]]
-ignore_errored_trials: True
-num_experiment_per_gpu: 5
+search_algo: random
+optim_metrics:
+  val_reward: max
+ignore_invalid_params: False
+gpu_mb_per_experiment: 1000
+cpus_per_experiment: 0.01

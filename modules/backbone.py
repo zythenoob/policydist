@@ -48,7 +48,8 @@ class Backbone(nn.Module):
         """
         grads = []
         for pp in list(self.parameters()):
-            grads.append(pp.grad.view(-1))
+            if pp.grad is not None:
+                grads.append(pp.grad.view(-1))
         return grads
 
 

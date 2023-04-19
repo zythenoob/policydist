@@ -16,6 +16,7 @@ class BaseModel(nn.Module):
 
         self.action_space = np.arange(config.backbone_config.output_dim)
         self.updates = 0
+        self.online = False
         pass
 
     @abstractmethod

@@ -27,7 +27,8 @@ def plot_lines(path, ep, t_r, updates, rewards):
     plt.tight_layout()
     ax = fig.add_subplot(111)  # Create matplotlib axes
     ax2 = ax.twinx()
-    ax.axhline(y=t_r, color='r', linestyle='dotted', label="Teacher reward")
+    # ax.axhline(y=t_r, color='r', linestyle='dotted', label="Teacher reward")
+    # min_reward = 0
 
     for k in updates.keys():
         if len(updates[k][0]) == 0:
@@ -36,6 +37,7 @@ def plot_lines(path, ep, t_r, updates, rewards):
         reward_mean = np.mean(rewards[name], axis=1)
         reward_std = np.std(rewards[name], axis=1)
         update_mean = np.mean(updates[name], axis=1)
+        # min_reward = min(min_reward, min(update_mean))
         # rewards
         ax.plot(ep, reward_mean, label=f'{name} rewards')
         ax.fill_between(ep, reward_mean-reward_std, reward_mean+reward_std, alpha=.1)
@@ -48,30 +50,37 @@ def plot_lines(path, ep, t_r, updates, rewards):
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax2.legend(lines + lines2, labels + labels2, loc='lower right')
+    ax2.legend(lines + lines2, labels + labels2, loc='upper left')
 
     # ax.set_xticks(np.arange(8), labels, rotation=0)
-    ax.set_xlim((0, 100))
+    ax.set_xlim((0, max_ep))
+    # ax.set_ylim((min_reward, t_r+100))
     fig.tight_layout(pad=0.4)
     img = fig2img(fig)
     plt.close()
     path.mkdir(exist_ok=True, parents=True)
-    img_path = path.joinpath(f"result_walker.png")
+    img_path = path.joinpath(f"result_{env_name}.png")
     img.save(img_path)
 
 
 if __name__ == "__main__":
-    experiment_dir = Path("/home/ji/experiments/walker")
+    env_name = "walker"
+    # env_name = "halfcheetah"
+    experiment_dir = Path(f"/home/ji/experiments/{env_name}")
     experiment_paths = list(experiment_dir.rglob("default_config.yaml"))
     results_dir = Path("/home/ji/experiments/").joinpath("analysis")
 
+    max_ep = 100
+
     # fig, ax = plt.subplots()
-    episodes = np.arange(100) + 1
+    episodes = np.arange(max_ep) + 1
     updates = {}
     rewards = {}
     teacher_reward = []
 
     for path in experiment_paths:
+        # if 'experiment_d633_b312' in path.as_posix():
+        #     continue
         path = path.parent
         try:
 
@@ -80,12 +89,15 @@ if __name__ == "__main__":
                 experiment_dir=path,
             )
             method_name = results.config.model_config.name
+            print(method_name)
             data = results.data
 
-            updates[method_name] = [[] for _ in range(100)]
-            rewards[method_name] = [[] for _ in range(100)]
+            updates[method_name] = [[] for _ in range(max_ep)]
+            rewards[method_name] = [[] for _ in range(max_ep)]
 
             for i, row in data.iterrows():
+                if i >= max_ep:
+                    continue
                 train_ep = int(row['current_epoch'])
                 updates[method_name][train_ep].append(float(row['current_iteration']))
                 rewards[method_name][train_ep].append(float(row['val_reward']))

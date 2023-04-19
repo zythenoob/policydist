@@ -9,20 +9,20 @@ train_config:
   dataset_root_path: /tmp/data
   epochs: 1
   # train
-  max_episodes: 100
-  val_episodes: 20
-  train_iter: 3
+  max_episodes: 200
+  val_episodes: 5
+  train_iter: 4
   batch_size: 64
   # optimizer
   optimizer_config:
     name: adam
     arguments:
-      lr: 1e-4
+      lr: 2e-4
       betas: [0.5, 0.999]
 
 model_config:
   name: spd
-  buffer_size: 200
+  buffer_size: 500
   replay_size: 64
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
@@ -34,16 +34,16 @@ model_config:
 
 search_space:
   train_config.train_iter:
-    value_range: [1, 5]
+    value_range: [1, 10]
     value_type: int
   model_config.replay_size:
-    value_range: [16, 200]
+    value_range: [10, 500]
     value_type: int
   model_config.recent_replay_ratio:
     value_range: [0, 1.0]
     value_type: float
   model_config.sup_decay:
-    value_range: [0.5, 1.0]
+    value_range: [0, 1.0]
     value_type: float
   model_config.threshold:
     value_range: [5, 50]
@@ -51,8 +51,8 @@ search_space:
   model_config.direction_threshold:
     value_range: [0, 1.0]
     value_type: float
-total_trials: 100
-concurrent_trials: 10
+total_trials: 200
+concurrent_trials: 20
 search_algo: tpe
 optim_metrics:
   avg_val_reward: max

@@ -133,12 +133,15 @@ class PDWrapper(ModelWrapper):
         max_iter = self.train_dataloader.max_steps
 
         state = env.reset()
+        step = 0
         for i in range(max_iter):
             # observe
+            step += 1
             action = model.observe(state, tag)
             next_state, reward, terminate = env.step(action.numpy()[0])
             if tag == "train":
                 model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
+                self.train_student(model)
                 if isinstance(model, SPD) and model.surprise_state:
                     self.train_student(model)
                     model.surprise_state = False
@@ -155,7 +158,8 @@ class PDWrapper(ModelWrapper):
         # train
         if tag == "train":
             if not isinstance(model, SPD):
-                self.train_student(model)
+                # self.train_student(model)
+                model.memory.empty()
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter

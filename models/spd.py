@@ -67,31 +67,49 @@ class SPD(BaseModel):
         grads = self.student.get_grads()
         self.student.zero_grad()
 
-        if surprise_score > self.threshold:
+        if not self.memory.is_full():
+            self.surprise_state = True
+            self.memory.add_data(states=states, actions=actions, **kwargs)
+        elif surprise_score > self.threshold:
             # check surprise direction
-            sim = 1.0
-            if self.memory.is_full():
-                buf_samples = self.memory.get_all_data()
-                buf_length = len(self.memory)
-                minibatch = 100
-                minibatch_sim = []
-                for idx in range(0, buf_length, minibatch):
-                    buf_states, buf_actions = buf_samples['states'][idx: idx + minibatch].to(self.device), buf_samples['actions'][idx: idx + minibatch].to(self.device)
-                    _, loss = self.forward(buf_states, buf_actions)
-                    loss.backward()
-                    buf_grads = self.student.get_grads()
-                    minibatch_sim.append((F.cosine_similarity(grads, buf_grads, dim=0) + 1).cpu().item() * len(buf_states))
-                    self.student.zero_grad()
-                sim = np.sum(minibatch_sim) / buf_length
+            buf_samples = self.memory.get_all_data()
+            buf_length = len(self.memory)
+            minibatch = 100
+            minibatch_sim = []
+            for idx in range(0, buf_length, minibatch):
+                buf_states = buf_samples['states'][idx: idx + minibatch].to(self.device)
+                buf_actions = buf_samples['actions'][idx: idx + minibatch].to(self.device)
+                _, loss = self.forward(buf_states, buf_actions)
+                loss.backward()
+                buf_grads = self.student.get_grads()
+                minibatch_sim.append((F.cosine_similarity(grads, buf_grads, dim=0) + 1).cpu().item() * len(buf_states))
+                self.student.zero_grad()
+            sim = np.sum(minibatch_sim) / buf_length
 
             if sim > self.direction_threshold:
                 self.surprise_state = True
                 self.memory.add_data(states=states, actions=actions, **kwargs)
 
-                # self.sup_magnitudes.append(surprise_score.cpu().item())
-        
-        # if self.updates > 0 and self.updates % 1000 == 0:
-        #     print(f"recent surprise magnitudes: {np.mean(self.sup_magnitudes[-1000:])}")
+        # if surprise_score > self.threshold:
+        #     # check surprise direction
+        #     sim = 1.0
+        #     if self.memory.is_full():
+        #         buf_samples = self.memory.get_all_data()
+        #         buf_length = len(self.memory)
+        #         minibatch = 100
+        #         minibatch_sim = []
+        #         for idx in range(0, buf_length, minibatch):
+        #             buf_states, buf_actions = buf_samples['states'][idx: idx + minibatch].to(self.device), buf_samples['actions'][idx: idx + minibatch].to(self.device)
+        #             _, loss = self.forward(buf_states, buf_actions)
+        #             loss.backward()
+        #             buf_grads = self.student.get_grads()
+        #             minibatch_sim.append((F.cosine_similarity(grads, buf_grads, dim=0) + 1).cpu().item() * len(buf_states))
+        #             self.student.zero_grad()
+        #         sim = np.sum(minibatch_sim) / buf_length
+
+        #     if sim > self.direction_threshold:
+        #         self.surprise_state = True
+        #         self.memory.add_data(states=states, actions=actions, **kwargs)
 
     def replay(self, size=None):
         if size is None:
