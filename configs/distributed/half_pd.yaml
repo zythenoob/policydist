@@ -1,6 +1,6 @@
-experiment_dir: "./experiments/halfcheetah"
+experiment_dir: "/home/ji/experiments/halfcheetah"
 verbose: tqdm
-amp: false
+amp: true
 device: cuda
 tensorboard: true
 
@@ -9,9 +9,9 @@ train_config:
   dataset_root_path: /tmp/data
   epochs: 1
   # train
-  max_episodes: 100
-  val_episodes: 100
-  train_iter: 1000
+  max_episodes: 300
+  val_episodes: 10
+  train_iter: 10
   batch_size: 64
   # optimizer
   optimizer_config:
@@ -21,7 +21,7 @@ train_config:
       betas: [0.5, 0.999]
 
 model_config:
-  name: pd
+  name: onlinepd
   buffer_size: 1000
   replay_size: 64
   teacher_smooth_factor: 1.0
@@ -30,7 +30,7 @@ model_config:
 search_space:
   train_config.env_seed:
     categorical_values: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
-total_trials: 20
+total_trials: 10
 concurrent_trials: 10
 search_algo: random
 optim_metrics:

@@ -16,3 +16,7 @@ class ReservoirPD(PD):
         super().__init__(config)
         self.memory = ReservoirBuffer(config.buffer_size)
         self.online = False
+
+    def add_data(self, **kwargs):
+        self.teacher.add_sequence_stats(kwargs['rewards'])
+        self.buffer_updates += self.memory.add_data(**kwargs)

@@ -20,6 +20,7 @@ class PD(BaseModel):
 
         self.teacher_smooth_factor = config.teacher_smooth_factor
         self.teacher_std = config.teacher_std
+        self.online = False
 
     @torch.no_grad()
     def observe(self, state, tag):
@@ -50,3 +51,4 @@ class PD(BaseModel):
     def add_data(self, **kwargs):
         self.teacher.add_sequence_stats(kwargs['rewards'])
         self.memory.add_data(**kwargs)
+        self.buffer_updates += 1

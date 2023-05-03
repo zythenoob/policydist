@@ -9,10 +9,10 @@ train_config:
   dataset_root_path: /tmp/data
   epochs: 1
   # train
-  max_episodes: 300
+  max_episodes: 200
   val_episodes: 10
-  train_iter: 2
-  batch_size: 1
+  train_iter: 2000
+  batch_size: 10
   # optimizer
   optimizer_config:
     name: adam
@@ -21,9 +21,9 @@ train_config:
       betas: [0.5, 0.999]
 
 model_config:
-  name: onlinepd
+  name: reservoirpd
   buffer_size: 500
-  replay_size: 20
+  replay_size: 32
   teacher_smooth_factor: 1.0
   teacher_std: 1e-4
 

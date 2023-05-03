@@ -15,7 +15,7 @@ class BaseModel(nn.Module):
         self.replay_size = config.replay_size
 
         self.action_space = np.arange(config.backbone_config.output_dim)
-        self.updates = 0
+        self.buffer_updates = 0
         self.online = False
         pass
 
@@ -32,6 +32,7 @@ class BaseModel(nn.Module):
 
     def add_data(self, **kwargs):
         self.memory.add_data(**kwargs)
+        self.buffer_updates += 1
 
     def set_train(self):
         if hasattr(self, "teacher"):

@@ -14,7 +14,7 @@ class PDMetrics(TrainMetrics):
     def __init__(self, val_episodes, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.val_episodes = val_episodes
-        self.custom_attrs = ["step_reward", "step_episode"]
+        self.custom_attrs = ["step_reward", "step_episode", "buf_update"]
         self.custom_metrics = {}
         self.val_rewards = []
         self._init_custom_metrics()
@@ -54,12 +54,14 @@ class PDMetrics(TrainMetrics):
         train_reward = self.get_avg_reward("train")
         val_reward = self.get_avg_reward("val")
         self.val_rewards.append(val_reward)
-        avg_val_reward = np.mean(np.array(self.val_rewards)[-5:])
+        avg_val_reward = np.mean(np.array(self.val_rewards)[-10:])
+        buf_update = getattr(self, f"train_buf_update").arr[-1]
 
         return {
             f'train_reward': train_reward,
             f'val_reward': val_reward,
             f'avg_val_reward': avg_val_reward,
+            f'buf_update': buf_update,
         }
 
     def get_avg_reward(self, tag):

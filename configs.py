@@ -28,7 +28,8 @@ class PDModelConfig(ModelConfig):
     recent_replay_ratio: float = 0.5
     sup_decay: float = 0.8
     threshold: float = 10.0
-    direction_threshold: float = -1.0
+    direction_threshold: float = 0.0
+    sample_surprise_count: int = 1 
 
 
 @ablator.configclass

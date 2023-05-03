@@ -26,10 +26,8 @@ def get_display_name(name):
         return "PD (FIFO)"
     elif name == "spd":
         return "SPD (FIFO)"
-    elif name == "spdb":
-        return "SPD (FIFO)"
     elif name == "onlinepd":
-        return "Online PD (FIFO)"
+        return "Online PD"
     elif name == "reservoirpd":
         return "PD (Reservoir)"
     return ""
@@ -75,19 +73,17 @@ def plot_lines(path, ep, t_r, updates, rewards):
     img = fig2img(fig)
     plt.close()
     path.mkdir(exist_ok=True, parents=True)
-    img_path = path.joinpath(f"result_{env_name}.png")
+    img_path = path.joinpath(f"ablation_{hparam}.png")
     img.save(img_path)
 
 
 if __name__ == "__main__":
-    # env_name = "walker"
-    # env_name = "hopper"
-    env_name = "halfcheetah"
-    experiment_dir = Path(f"/home/ji/experiments/{env_name}")
+    hparam = "iter"
+    experiment_dir = Path(f"/home/ji/experiments/walker_ablation")
     experiment_paths = list(experiment_dir.rglob("default_config.yaml"))
-    results_dir = Path("/home/ji/experiments/").joinpath("analysis")
+    results_dir = Path("/home/ji/experiments/").joinpath("analysis/ablation")
 
-    max_ep = 200
+    max_ep = 100
 
     # fig, ax = plt.subplots()
     episodes = np.arange(max_ep) + 1
@@ -96,8 +92,8 @@ if __name__ == "__main__":
     teacher_reward = []
 
     for path in experiment_paths:
-        if 'experiment_fa40_04af' in path.as_posix():
-            continue
+        # if 'experiment_00f2_27c1' in path.as_posix():
+        #     continue
         path = path.parent
         try:
 

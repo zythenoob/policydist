@@ -12,6 +12,7 @@ from configs import PDModelConfig, PDTrainConfig
 from dataset import RLDataset
 from models import BaseModel
 from models.spd import SPD
+from models.pd import PD
 from modules.evaluation import PDMetrics
 from utils import get_dataset, tensorboard_log_step
 
@@ -72,7 +73,7 @@ class PDWrapper(ModelWrapper):
         for k, v in self.metrics.to_dict().items():
             if k in ['best_iteration', 'best_loss', 'current_epoch']:
                 continue
-            if 'loss' in k or 'reward' in k:
+            if 'loss' in k or 'reward' in k or 'buf_update' in k:
                 msg.append(f"{k}: {v:.3f}")
         return f"Training episode [{self.current_episode}/{self.train_config.max_episodes}]: " \
                + " / ".join(msg)
@@ -85,14 +86,6 @@ class PDWrapper(ModelWrapper):
             static_aux_metrics=self.train_stats,
             moving_aux_metrics=["loss"] + getattr(self, "aux_metric_names", []),
         )
-
-        # self.train_tqdm = tqdm(
-        #     total=self.epoch_len,
-        #     bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}",
-        #     position=0,
-        #     leave=True,
-        #     dynamic_ncols=True,
-        # )
 
         self.train_online()
         return self.metrics
@@ -133,22 +126,19 @@ class PDWrapper(ModelWrapper):
         max_iter = self.train_dataloader.max_steps
 
         state = env.reset()
-        step = 0
         for i in range(max_iter):
             # observe
-            step += 1
             action = model.observe(state, tag)
             next_state, reward, terminate = env.step(action.numpy()[0])
             if tag == "train":
                 model.add_data(states=state, actions=action, rewards=reward, next_states=next_state, masks=terminate)
-                self.train_student(model)
-                if isinstance(model, SPD) and model.surprise_state:
+                if model.online:
                     self.train_student(model)
-                    model.surprise_state = False
 
             aux_metrics = {
                 f'step_reward': reward,
                 f'step_episode': np.array([episode_id]),
+                f'buf_update': model.buffer_updates,
             }
             self.metrics.update_custom_metrics(aux_metrics, tag=tag)
             state = next_state.clone()
@@ -156,10 +146,8 @@ class PDWrapper(ModelWrapper):
                 break
 
         # train
-        if tag == "train":
-            if not isinstance(model, SPD):
-                # self.train_student(model)
-                model.memory.empty()
+        if tag == "train" and not model.online:
+            self.train_student(model)
 
     def train_student(self, model):
         train_iter = self.train_config.train_iter
@@ -167,7 +155,6 @@ class PDWrapper(ModelWrapper):
             batch = model.replay()
             _, train_metrics = self.train_step(batch)
             self.metrics.update_ma_metrics(train_metrics, tag="train")
-            model.updates += 1
 
     def make_dataloader_val(self, run_config: RunConfig):
         return None  # not a good idea to return wrong information i.e. train dataloader. Better to raise an error

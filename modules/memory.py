@@ -145,6 +145,8 @@ class ReservoirBuffer(Buffer):
         if not hasattr(self, 'x'):
             self.init_tensors(states, actions, rewards, next_states, masks)
 
+        added = 0
+
         for i in range(states.shape[0]):
             index = reservoir(self.num_seen_examples, self.buffer_size)
             self.num_seen_examples += 1
@@ -154,6 +156,8 @@ class ReservoirBuffer(Buffer):
                 self.rewards[index] = rewards[i].to(self.device)
                 self.next_states[index] = next_states[i].to(self.device)
                 self.masks[index] = masks[i].to(self.device)
+                added += 1
+        return added
 
 
 class FIFOBuffer(Buffer):
