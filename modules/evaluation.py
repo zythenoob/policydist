@@ -1,84 +1,76 @@
 from typing import Dict, Any
 
 import numpy as np
-from trainer.modules.main import Metrics, MovingAverage
 from typing import List
 
+from ablator.modules.metrics.main import TrainMetrics
+from ablator.modules.metrics.stores import ArrayStore
+import ablator.utils.base as butils
 
-class PDMetrics(Metrics):
+
+class PDMetrics(TrainMetrics):
     current_task_iteration: int = 0
 
-    def __init__(self, val_trials, *args, **kwargs) -> None:
+    def __init__(self, val_episodes, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.n_tasks = 0
-        self.val_trials = val_trials
+        self.val_episodes = val_episodes
+        self.custom_attrs = ["step_reward", "step_episode", "buf_update"]
+        self.custom_metrics = {}
+        self.val_rewards = []
+        self._init_custom_metrics()
 
-    def eval_best(self, div_factor, div_warm_up_steps):
-        is_best = False
-        # Use val loss for scheduling or finding best checkpoint
-        val_loss = self.val_loss
-        is_best = val_loss < self.best_loss
-        if is_best or self.best_loss == 0:
-            self.best_iteration = self.current_iteration
-            self.best_loss = val_loss
+    def to_dict(self):
+        attrs = ['train_loss']
+        ma_attrs = {k: self._get_ma(k).value for k in attrs}
+        static_attrs = {k: getattr(self, k) for k in self.__static_aux_attributes__}
+        return {**ma_attrs, **static_attrs, **self.custom_metrics}
 
-    @classmethod
-    def _make_msg(cls, metrics: Dict[str, Any]):
-        return " / ".join(
-            [
-                f"{k}: {v:.2e}"
-                # else f"{k}: {v}"
-                for k, v in metrics.items()
-                if isinstance(v, (MovingAverage, np.number, int, float))
-                and "aux" not in k
-            ]
-        )
+    def update_custom_metrics(self, metric_dict: dict[str, Any], tag: str):
+        metric_dict = butils.iter_to_numpy(metric_dict)
+        for k, v in metric_dict.items():
+            attr_name = f"{tag}_{k}"
+            _arr = getattr(self, attr_name, None)
+            assert _arr is not None, f"invalid custom metric {attr_name}"
+            _arr.append(v)
 
-    def get_msg(self):
-        base_metrics = self.get_base_metrics()
-        aux_metrics = self.get_added_metrics()
-        base_msg = self._make_msg(base_metrics)
-        aux_msg = self._make_msg(aux_metrics)
+    def _init_custom_metrics(self):
+        for tag in self.__tags__:
+            for attr in self.custom_attrs:
+                attr_name = f"{tag}_{attr}"
+                _arr = ArrayStore(
+                    batch_limit=self.__batch_limit__,
+                    memory_limit=self.__memory_limit__,
+                )
+                setattr(self, attr_name, _arr)
 
-        msg = f"Training - " f"{base_msg} {aux_msg} "
-        return msg
+    def evaluate(self, tag, reset=True, update_ma=True):
+        if tag == "val":
+            self.custom_metrics.update(self.eval_rewards())
+            for attr in self.custom_attrs:
+                _arr = getattr(self, f"val_{attr}", None)
+                _arr.reset()
 
-    def append(self, tag, pred=None, labels=None, loss=None, aux_metrics=None):
-        super().append(None, None, tag, loss, aux_metrics)
-        if aux_metrics is not None:
-            limits = []
-            for k, v in aux_metrics.items():
-                tagged_arr = self.get_arr(f"{tag}_{k}")
-                tagged_arr.append(v)
-                limits.append(tagged_arr.limit)
-            min_limit = min(limits)
-            for k in aux_metrics.keys():
-                tagged_arr = self.get_arr(f"{tag}_{k}")
-                tagged_arr.limit = min_limit
-
-    def eval_metrics(self, tag):
-        super().eval_metrics(tag)
-        aux_metrics = {}
-        for k in self.__dict__.keys():
-            if k.endswith("_arr__"):
-                _tag, *name, _ = k.split("_")[2:-2]
-                if _tag == tag:
-                    name = "_".join(name)
-                    aux_metrics[name] = self.get_arr(f"{tag}_{name}").arr
-
-        self.update(self._make_aux_metrics(tag, **aux_metrics))
-
-    def _make_aux_metrics(self, tag, rewards, traj_names, **kwargs):
-        rewards = np.array(rewards)
-        traj_switch_idx = np.nonzero(np.array(traj_names[1:]) != np.array(traj_names[:-1]))[0]
-        cutoff = 10 if tag == "train" else self.val_trials
-        # avg reward of last 10 trajectories in training
-        traj_switch_idx = traj_switch_idx[-cutoff:]
-        avg_reward = 0
-        if len(traj_switch_idx) > 0:
-            avg_reward = np.sum(rewards[traj_switch_idx[0]:]) / len(traj_switch_idx)
+    def eval_rewards(self):
+        train_reward = self.get_avg_reward("train")
+        val_reward = self.get_avg_reward("val")
+        self.val_rewards.append(val_reward)
+        avg_val_reward = np.mean(np.array(self.val_rewards)[-10:])
+        buf_update = getattr(self, f"train_buf_update").arr[-1]
 
         return {
-            f'{tag}_reward': avg_reward,
+            f'train_reward': train_reward,
+            f'val_reward': val_reward,
+            f'avg_val_reward': avg_val_reward,
+            f'buf_update': buf_update,
         }
 
+    def get_avg_reward(self, tag):
+        cutoff = 10 if tag == "train" else self.val_episodes
+        rewards = getattr(self, f"{tag}_step_reward").get()[0]
+        episodes = getattr(self, f"{tag}_step_episode").get()[0]
+        ep_ids = np.unique(episodes)[-cutoff:]
+        avg_reward = 0
+        for ep in ep_ids:
+            avg_reward += np.sum(rewards[episodes == ep])
+        avg_reward /= len(ep_ids)
+        return avg_reward

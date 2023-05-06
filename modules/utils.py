@@ -10,5 +10,16 @@ def kl_div_kd_loss(teacher_dist_info, student_dist_info):
     kl = torch.mean(kl_divergence(pi, pi_new))
     return kl
 
+
 def mse_kd_loss(source, target):
     return F.mse_loss(source, target)
+
+
+def z_score(metric, mu, std):
+    if mu is None:
+        return torch.zeros_like(metric)
+    else:
+        delta = metric - mu
+        delta = delta.clone()
+        scores = delta / (std + 1e-8) ** 0.5
+    return scores

@@ -15,7 +15,8 @@ class BaseModel(nn.Module):
         self.replay_size = config.replay_size
 
         self.action_space = np.arange(config.backbone_config.output_dim)
-        self.updates = 0
+        self.buffer_updates = 0
+        self.online = False
         pass
 
     @abstractmethod
@@ -31,6 +32,20 @@ class BaseModel(nn.Module):
 
     def add_data(self, **kwargs):
         self.memory.add_data(**kwargs)
+        self.buffer_updates += 1
+
+    def set_train(self):
+        if hasattr(self, "teacher"):
+            self.student.train()
+            self.teacher.reset()
+        else:
+            self.train()
+
+    def set_eval(self):
+        if hasattr(self, "teacher"):
+            self.student.eval()
+        else:
+            self.eval()
 
 
 class DTModel(BaseModel):
@@ -40,8 +55,10 @@ class DTModel(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.memory = None
-        self.model = DecisionTransformerModel.from_pretrained("edbeeching/decision-transformer-gym-hopper-medium")
+        self.model = DecisionTransformerModel.from_pretrained(config.backbone_config.pretrained)
         self.model.eval()
+
+        print('Num teacher parameters:', sum(p.numel() for p in self.model.parameters() if p.requires_grad))
         # sequence
         self.step = 0
         self.max_seq_len = self.model.config.max_length
@@ -158,4 +175,3 @@ class DTModel(BaseModel):
         )
 
         return action_preds[0, -1]
-

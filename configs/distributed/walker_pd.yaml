@@ -1,0 +1,40 @@
+experiment_dir: "/home/ji/experiments/walker"
+verbose: tqdm
+amp: true
+device: cuda
+tensorboard: true
+
+train_config:
+  dataset: walker
+  dataset_root_path: /tmp/data
+  epochs: 1
+  # train
+  max_episodes: 200
+  val_episodes: 10
+  train_iter: 2000
+  batch_size: 10
+  # optimizer
+  optimizer_config:
+    name: adam
+    arguments:
+      lr: 2e-4
+      betas: [0.5, 0.999]
+
+model_config:
+  name: reservoirpd
+  buffer_size: 500
+  replay_size: 32
+  teacher_smooth_factor: 1.0
+  teacher_std: 1e-4
+
+search_space:
+  train_config.env_seed:
+    categorical_values: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+total_trials: 10
+concurrent_trials: 10
+search_algo: random
+optim_metrics:
+  val_reward: max
+ignore_invalid_params: False
+gpu_mb_per_experiment: 1000
+cpus_per_experiment: 0.01

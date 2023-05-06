@@ -1,0 +1,28 @@
+experiment_dir: "/tmp/experiments"
+verbose: tqdm
+amp: true
+device: cuda:0
+tensorboard: true
+
+train_config:
+  dataset: walker
+  dataset_root_path: /tmp/data
+  epochs: 1
+  # train
+  max_episodes: 100
+  val_episodes: 10
+  train_iter: 1
+  batch_size: 64
+  # optimizer
+  optimizer_config:
+    name: adam
+    arguments:
+      lr: 2e-4
+      betas: [0.5, 0.999]
+
+model_config:
+  name: pd
+  buffer_size: 200
+  replay_size: 20
+  teacher_smooth_factor: 1.0
+#  teacher_std: 1e-4

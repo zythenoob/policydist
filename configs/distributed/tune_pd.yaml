@@ -1,0 +1,40 @@
+experiment_dir: "/home/ji/experiments"
+logger_configs:
+  - name: tensorboard
+train_config:
+  dataset: walker
+  dataset_root_path: /tmp/data
+  epochs: 1
+  # train
+  max_episodes: 100
+  val_episodes: 100
+  train_iter: 50
+  batch_size: 64
+  device: cuda
+  amp: true
+  debug: false
+  resume: false
+  # optimizer
+  optimizer_config:
+    name: adam
+    arguments:
+      lr: 1e-4
+      betas: [0.9, 0.999]
+model_config:
+  name: pd
+  buffer_size: 500
+  replay_size: 32
+  teacher_smooth_factor: 1.0
+  teacher_std: 1e-4
+
+tune:
+  # train_config.env_seed: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+  train_config.train_iter: [ 100, 2000 ]
+  model_config.teacher_smooth_factor: [ 0.1, 10.0 ]
+  model_config.teacher_std: [ 1e-8, 1.0 ]
+total_trials: 100
+concurrent_trials: 20
+experiment_type: tpe
+optim_directions: [[val_reward, max]]
+ignore_errored_trials: True
+num_experiment_per_gpu: 10

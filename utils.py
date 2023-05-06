@@ -3,7 +3,13 @@ import os
 import importlib
 from pathlib import Path
 
+from ablator.modules.loggers.main import SummaryLogger
+
 import models
+from dataset.halfcheetah import HalfCheetah
+from dataset.hopper import Hopper
+from dataset.walker import Walker
+from modules.evaluation import PDMetrics
 
 
 def get_all_models():
@@ -28,3 +34,22 @@ for model in get_all_models():
         model_names[model] = getattr(mod, class_name)
     except:
         logging.warning(f"Could not load a baseline from: {model}")
+
+
+def get_dataset(config):
+    if config.dataset == "hopper":
+        return Hopper(config)
+    elif config.dataset == "walker":
+        return Walker(config)
+    elif config.dataset == "halfcheetah":
+        return HalfCheetah(config)
+    else:
+        raise NotImplementedError
+
+def tensorboard_log_step(
+    writer: SummaryLogger, metrics: PDMetrics, iteration: int
+):
+    writer._add_metric(
+        "updates", metrics.num_updates, iteration,
+    )
+

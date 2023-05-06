@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from models import BaseModel, DTModel
 from modules.backbone import PolicyNetwork
-from modules.memory import FIFOBuffer
+from modules.memory import FIFOBuffer, PDBuffer, ReservoirBuffer
 from modules.utils import mse_kd_loss, kl_div_kd_loss
 
 """
@@ -20,6 +20,7 @@ class PD(BaseModel):
 
         self.teacher_smooth_factor = config.teacher_smooth_factor
         self.teacher_std = config.teacher_std
+        self.online = False
 
     @torch.no_grad()
     def observe(self, state, tag):
@@ -41,12 +42,13 @@ class PD(BaseModel):
 
     def compute_loss(self, s_dist, actions):
         t_mean = actions.to(self.device) / self.teacher_smooth_factor
+        # deterministic
         s_mean, s_std = s_dist.loc, s_dist.scale
-        # fake teacher std
-        t_std = torch.ones(actions.shape[-1]) * self.teacher_std
-        t_std = torch.stack([t_std for _ in range(actions.shape[0])]).to(self.device)
+        deterministic_std = torch.ones(actions.shape[-1]) * self.teacher_std
+        t_std = torch.stack([deterministic_std for _ in range(actions.shape[0])]).to(self.device)
         return kl_div_kd_loss([t_mean, t_std], [s_mean, s_std])
 
     def add_data(self, **kwargs):
         self.teacher.add_sequence_stats(kwargs['rewards'])
         self.memory.add_data(**kwargs)
+        self.buffer_updates += 1

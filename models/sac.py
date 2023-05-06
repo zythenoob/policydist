@@ -7,10 +7,26 @@ from models import BaseModel
 from modules.backbone import ValueNetwork, SoftQNetwork, PolicyNetwork
 
 
+HPARAMS = {
+    "gamma": 0.99,
+    "tau": 0.01,
+    "target_update_freq": 1,
+}
+
+
+def soft_update(target_net, net, tau):
+    for param, target_param in zip(net.parameters(), target_net.parameters()):
+        target_param.data.copy_(tau * param.data +
+                                (1 - tau) * target_param.data)
+
+def hard_update(target_net, net):
+    for target_param, param in zip(target_net.parameters(), net.parameters()):
+        target_param.data.copy_(param.data)
+
+
 class SAC(BaseModel):
     def __init__(self, config):
         super().__init__(config)
-        raise NotImplementedError
         self.value_net = ValueNetwork(config.backbone_config)
         self.target_value_net = ValueNetwork(config.backbone_config)
         hard_update(self.target_value_net, self.value_net)
@@ -18,12 +34,12 @@ class SAC(BaseModel):
         self.soft_q_net = SoftQNetwork(config.backbone_config)
         self.policy_net = PolicyNetwork(config.backbone_config)
 
-        self.gamma = config.discount_factor
-        self.tau = config.soft_update_factor
-        self.target_update_freq = config.target_update_freq
+        self.gamma = HPARAMS['gamma']
+        self.tau = HPARAMS['tau']
+        self.target_update_freq = HPARAMS['target_update_freq']
 
     @torch.no_grad()
-    def observe(self, state):
+    def observe(self, state, tag):
         self.policy_net.eval()
         state = state.to(self.device)
         action = self.policy_net.sample_action(state)
@@ -41,7 +57,11 @@ class SAC(BaseModel):
 
         expected_q_value = self.soft_q_net(states, actions)
         expected_value = self.value_net(states)
-        new_action, log_prob, z, mean, log_std = self.policy_net(states)
+        dist = self.policy_net(states)
+        r = dist.rsample()
+        z = dist.sample()
+        new_action = torch.tanh(z)
+        log_prob = (dist.log_prob(r) - torch.log(1 - new_action.pow(2) + 1e-8)).sum(1, keepdim=True)
 
         target_value = self.target_value_net(next_states)
         next_q_value = rewards + (1 - masks) * self.gamma * target_value
@@ -53,12 +73,6 @@ class SAC(BaseModel):
 
         log_prob_target = expected_new_q_value - expected_value
         policy_loss = (log_prob * (log_prob - log_prob_target).detach()).mean()
-
-        # regularization
-        # mean_loss = mean_lambda * mean.pow(2).mean()
-        # std_loss = std_lambda * log_std.pow(2).mean()
-        # z_loss = z_lambda * z.pow(2).sum(1).mean()
-        # policy_loss += mean_loss + std_loss + z_loss
 
         if self.updates % self.target_update_freq == 0:
             soft_update(self.target_value_net, self.value_net, self.tau)
